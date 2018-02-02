@@ -70,4 +70,11 @@ function mobileScroll(view, state, update) {
   view.addEventListener('touchend', mobile, {passive: false});
   view.addEventListener('touchcancel', mobile, {passive: false});
 
+  const document = view.ownerDocument;
+  document.addEventListener('touchstart', event => {
+    if (event.target === document.body || event.target === document.documentElement) {
+      event.preventDefault();
+    }
+  });
+
 }
