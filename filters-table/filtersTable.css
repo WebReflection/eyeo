@@ -1,0 +1,141 @@
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+.filters-table
+{
+  border: 1px solid silver;
+  box-sizing: border-box;
+  height: 208px;
+}
+
+.filters-table *
+{
+  box-sizing: border-box;
+}
+
+.filters-table .thead
+{
+  font-size: small;
+  border-bottom: 1px solid silver;
+  cursor: default;
+}
+
+.filters-table .tbody
+{
+  overflow: hidden;
+}
+
+.filters-table .tr
+{
+  display: flex;
+}
+
+.filters-table .thead,
+.filters-table .tr:nth-child(2n)
+{
+  background-color: #eee;
+}
+
+.filters-table .tr > p
+{
+  padding: 2px;
+  margin: 0;
+}
+
+.filters-table .tr > p:nth-child(1)
+{
+  width: 60px;
+}
+
+.filters-table .tr > p:nth-child(2)
+{
+  text-overflow: ellipsis;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.filters-table .tr > p:nth-child(2):focus
+{
+  text-overflow: initial;
+}
+
+.filters-table .tr > p:nth-child(3)
+{
+  width: 32px;
+}
+
+.filters-table .tr > p:nth-child(4)
+{
+  width: 50px;
+  text-align: center;
+}
+
+.filters-table .tbody .tr > p:nth-child(1)
+{
+  text-align: center;
+}
+
+.filters-table .tr[data-invalid="true"]
+{
+  background: #FFAAAA;
+}
+
+.filters-table .tr[data-invalid="true"] [contenteditable]
+{
+  outline-color: red;
+}
+
+.filters-table-topbar
+{
+  padding: 0;
+  display: flex;
+}
+
+.filters-table-topbar > input,
+.filters-table-topbar > button
+{
+  box-sizing: border-box;
+  height: 26px;
+  padding: 4px;
+  margin: 0;
+  flex-grow: 1;
+}
+
+.filters-table-topbar > input
+{
+  flex-grow: 3;
+}
+
+.filters-table-scrollbar
+{
+  position: absolute;
+  width: 16px;
+  border: 1px solid silver;
+  border-left: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.filters-table-scrollbar,
+.filters-table-scrollbar > p
+{
+  box-sizing: border-box;
+  width: 16px;
+  padding: 0;
+  margin: 0;
+}

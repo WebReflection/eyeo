@@ -1,0 +1,102 @@
+<!doctype html>
+<!--
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html {
+  font-family: sans-serif;
+}
+body > * {
+  max-width: 600px;
+  margin: auto;
+}
+</style>
+<link rel="stylesheet" href="filtersTable.css">
+<script src="https://unpkg.com/hyperhtml@latest/index.js"></script>
+<script src="mobileScroll.js"></script>
+<script src="filtersTable.js"></script>
+<script>
+
+const easyList = fetch('https://easylist.to/easylist/easylist.txt').then(b => b.text());
+
+this.onload = () => {
+  easyList.then(text => {
+
+    const allFilters = text.replace(/^[![].*/gm, '').split('\n')
+                        .filter(text => text.trim().length)
+                        .map(text => ({
+                          enabled: true,
+                          text,
+                          hits: (Math.random() * 9) >>> 0
+                        }));
+
+    const filters = allFilters.slice();
+
+    hyperHTML.bind(document.body)`
+      <div class="filters-table-topbar">
+        <input placeholder="serach or insert" type=text>
+        <button>add</button>
+      </div>`;
+
+    // top par setup (should probably be within the component)
+    const add = document.body.querySelector('button');
+    add.disabled = true;
+    add.addEventListener('click', event => {
+      const text = search.value.trim();
+      if (text && allFilters.every(filter => filter.text !== text)) {
+        allFilters.push({
+          enabled: true,
+          text,
+          hits: 0
+        });
+        search.value = '';
+        search.dispatchEvent(new Event('keyup'));
+      }
+    });
+
+    const search = document.body.querySelector('input');
+    search.addEventListener('keyup', event => {
+      const text = event.currentTarget.value.trim();
+      filters.splice(0);
+      if (text) {
+        const sanitized = text.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
+        const re = new RegExp(sanitized, 'i');
+        add.disabled = false;
+        for (const filter of allFilters) {
+          if (re.test(filter.text)) {
+            filters.push(filter);
+          }
+        }
+      } else {
+        filters.push.apply(filters, allFilters);
+      }
+      table.update();
+    });
+
+    // table generation
+    const table = filtersTable(
+      document.body.appendChild(document.createElement('div')),
+      filters,
+      false // read-only
+    );
+
+  });
+};
+</script>
