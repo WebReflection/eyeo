@@ -32,6 +32,7 @@
   font-size: small;
   border-bottom: 1px solid silver;
   cursor: default;
+  user-select: none;
 }
 
 .filters-table .tbody
