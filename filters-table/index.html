@@ -48,7 +48,8 @@ this.onload = () => {
                         .map(text => ({
                           enabled: true,
                           text,
-                          hits: (Math.random() * 9) >>> 0
+                          hits: (Math.random() * 9) >>> 0,
+                          slow: Math.random() < .2 ? '🐌' : ''
                         }));
 
     const filters = allFilters.slice();

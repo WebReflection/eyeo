@@ -52,6 +52,17 @@ const filtersTable = (view, filters, readOnly) => {
         return fa.hits < fb.hits ? -sorter : sorter;
       });
       update();
+    },
+    snail: '',
+    bySnail(event) {
+      event.preventDefault();
+      sort.snail = sort.snail === '' ? '🐌' : '';
+      const sorter = sort.snail === '' ? 1 : -1;
+      filters.sort((fa, fb) => {
+        if (fa.slow === fb.slow) return 0;
+        return fa.slow < fb.slow ? -sorter : sorter;
+      });
+      update();
     }
   };
 
@@ -228,7 +239,7 @@ const getRow = (readOnly, filter, className, updateFilter) => {
           onfocus=${events.onfocus}
           onkeypress=${events.onkeypress}
         >${filter.text}</p>
-        <p></p>
+        <p>${filter.slow}</p>
         <p>${filter.hits}</p>
       </div>`;
   }
@@ -248,7 +259,7 @@ const updateTable = (render, sort, rows) => render`
     <div class="tr">
       <p onclick=${sort.byEnabled}>${'Enabled'}</p>
       <p onclick=${sort.byFilter}>${'Filter rule'}</p>
-      <p>!</p>
+      <p onclick=${sort.bySnail}>!</p>
       <p onclick=${sort.byHits}>${'Hits'}</p>
     </div>
   </div>
