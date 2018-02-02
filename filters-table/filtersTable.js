@@ -172,13 +172,32 @@ const createFilterEvents = (filter, update) => ({
     filter.enabled = event.currentTarget.checked;
   },
   onblur(event) {
-    update(filter, event);
+    const p = event.currentTarget;
+    const tr = p.closest('.tr');
+    delete p.dataset.before;
+    if (tr.dataset.invalid === 'false') {
+      update(filter, event);
+    } else {
+      tr.dataset.invalid = false;
+      p.textContent = p.dataset.text;
+    }
   },
   onfocus(event) {
-    // TODO: selection at the end?
   },
-  onkeypress(event) {
-    validateOrBlur(event);
+  onkeydown(event) {
+    const p = event.currentTarget;
+    switch (event.key) {
+      case 'Escape':
+      case 'Enter':
+        event.preventDefault();
+        event.currentTarget.blur();
+        break;
+      default:
+        const tr = p.closest('.tr');
+        const text = p.textContent.trim();
+        tr.dataset.invalid = !isValidText(text);
+        break;
+    }
   }
 });
 
@@ -237,7 +256,7 @@ const getRow = (readOnly, filter, className, updateFilter) => {
           data-text=${filter.text}
           onblur=${events.onblur}
           onfocus=${events.onfocus}
-          onkeypress=${events.onkeypress}
+          onkeydown=${events.onkeydown}
         >${filter.text}</p>
         <p>${filter.slow}</p>
         <p>${filter.hits}</p>
@@ -267,17 +286,3 @@ const updateTable = (render, sort, rows) => render`
     ${rows}
   </div>`;
 
-const validateOrBlur = event => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    event.currentTarget.blur();
-  } else {
-    const p = event.currentTarget;
-    const text = p.textContent.trim();
-    if (isValidText(text)) {
-      p.closest('.tr').dataset.invalid = false;
-    } else {
-      p.closest('.tr').dataset.invalid = true;
-    }
-  }
-};
