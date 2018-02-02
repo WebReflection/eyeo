@@ -35,6 +35,7 @@ function mobileScroll(view, state, update) {
       this.initialY = state.scroll.top + this.clientY;
     },
     ontouchmove(event) {
+      event.preventDefault();
       this.previousY = this.clientY;
       this.clientY = event.touches[0].clientY;
       state.scroll.top = this.initialY - this.clientY;

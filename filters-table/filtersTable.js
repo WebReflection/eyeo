@@ -164,7 +164,7 @@ const createFilterEvents = (filter, update) => ({
     update(filter, event);
   },
   onfocus(event) {
-    console.log(document.activeElement.setSelectionRange)
+    // TODO: selection at the end?
   },
   onkeypress(event) {
     validateOrBlur(event);
