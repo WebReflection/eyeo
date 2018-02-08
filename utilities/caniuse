@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+
+var browsers = [
+  'chrome 49',
+  'edge 15',
+  'firefox 51',
+  'opera 36'
+].join(', ');
+
+var caniuse = require('caniuse-api');
+switch (process.argv.length) {
+  case 3:
+    var found = [].concat(caniuse.find(process.argv[2]));
+    found.forEach(function (feature) {
+      console.log(feature + ': ' + (caniuse.isSupported(feature, browsers) ? '🍾 \x1B[1myup\x1B[0m 🎉' : 'nope'));
+    });
+    if (found.length < 1) console.log('I have no idea');
+    break;
+  default:
+    console.log('you need to specify a feature');
+}
