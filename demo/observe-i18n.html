@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <title>ElementObserver &amp; i18n</title>
+    <script>
+
+    // indirect MutationObserver wrapper
+    // capable of .start() .stop()
+    // and simplified creation
+    const ElementObserver = (() => {
+      const privates = new WeakMap();
+      return class ElementObserver {
+        constructor(target, callback, options) {
+          privates.set(this, {
+            observer: new MutationObserver(callback),
+            options: options || {},
+            target
+          });
+          this.start();
+        }
+        get observing() {
+          return privates.get(this).observing;
+        }
+        start() {
+          const pvt = privates.get(this);
+          if (pvt.observing) return;
+          pvt.observer.observe(pvt.target, pvt.options);
+          pvt.observing = true;
+        }
+        stop() {
+          const pvt = privates.get(this);
+          if (pvt.observing) {
+            pvt.observer.disconnect();
+            pvt.observing = false;
+          }
+        }
+      };
+    })();
+
+    // observe the HTML Element
+    // (pause it during infinite lists editing operations)
+    const htmlObserver = new ElementObserver(
+      document.documentElement,
+      function populate(mutations) {
+        for (const record of mutations) {
+          for (const node of record.addedNodes) {
+            if (node.nodeType === 1) {
+              if (node.hasAttribute('i18n')) {
+                node.textContent = node.getAttribute('i18n');
+              } else {
+                populate([{addedNodes: node.children}]);
+              }
+            }
+          }
+        }
+      },
+      {
+        childList: true,
+        subtree: true
+      }
+    );
+
+    // simulates nodes appended after
+    this.onload = function () {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <p i18n="hello-a-${Math.random()}"></p>
+        <p i18n="hello-b-${Math.random()}"></p>
+      `;
+      document.body.appendChild(div);
+    };
+    </script>
+  </head>
+  <body>
+    <div>
+        <p i18n="hello-world"></p>
+        <p i18n="hello-there"></p>
+    </div>
+  </body>
+</html>
