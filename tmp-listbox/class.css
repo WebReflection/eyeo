@@ -1,0 +1,75 @@
+.listbox
+{
+  max-width: 340px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.listbox,
+.listbox button,
+.listbox [role="listbox"],
+.listbox [role="option"]
+{
+  padding: 0;
+  margin: 0;
+  color: #4a4a4a;
+  background: #ffffff;
+  text-align: inherit;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.listbox button,
+.listbox [role="listbox"]
+{
+  box-sizing: inherit;
+  width: 100%;
+  border: 1px solid #bcbcbc;
+  cursor: pointer;
+}
+
+.listbox button,
+.listbox [role="option"]
+{
+  padding: 8px 12px;
+}
+
+.listbox button:focus
+{
+  outline: none;
+}
+
+.listbox [role="listbox"]
+{
+  position: absolute;
+  height: 310px;
+  bottom: 100%;
+  overflow: auto;
+  border: 1px solid #9b9b9b;
+  margin-bottom: -1px;
+}
+
+.listbox [role="option"]:before
+{
+  display: inline-block;
+  width: 20px;
+  content: ' ';
+  color: #a0a0a0;
+}
+
+.listbox [role="option"][aria-disabled="true"],
+.listbox [role="option"][aria-disabled="true"]:hover
+{
+  background: #eeeeee;
+  cursor: default;
+}
+
+.listbox [role="option"]:hover
+{
+  background: #e1f2fa;
+}
+
+.listbox [role="option"][aria-selected="true"]:before
+{
+  content: '✔';
+}

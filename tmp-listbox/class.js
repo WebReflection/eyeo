@@ -8,28 +8,69 @@ class Listbox {
   constructor(details) {
 
     // initial properties
+    this.getInfo = details.getInfo;
+    this.setInfo = details.setInfo;
     this.id = 'listbox-' + ('' + Math.random()).replace(/\D/, '');
-    this.details = details;
     this.items = [];
     this.nodes = [];
     this.selectedItem = -1;
     this.target = typeof details.target === 'string' ?
                   document.querySelector(details.target) : details.target;
 
+    this.target.classList.add('listbox');
+
     // a button is used as label to capture the initial focus
     this.label = this.target.appendChild(document.createElement('button'));
     this.label.id = this.id + '-label';
     this.label.textContent = details.label;
     this.label.setAttribute('aria-haspopup', this.id + '-popup');
+    this.label.setAttribute('aria-expanded', 'false');
+
+    this.label.addEventListener('blur', this);
+    this.label.addEventListener('focus', this);
 
     // the list of items is shown through a popup
     this.popup = this.target.appendChild(document.createElement('ul'));
     this.popup.id = this.id + '-popup';
     this.popup.setAttribute('tab-index', '-1');
     this.popup.setAttribute('role', 'listbox');
-    this.popup.setAttribute('aria-labelledby', '-1');
+    this.popup.setAttribute('aria-labelledby', this.label.id);
+    this.popup.setAttribute('hidden', '');
     for (const item of details.items)
       this.add(item);
+
+    this.popup.addEventListener('click', this);
+
+    // extra properties used to handle the listbox state
+    this._blurTimer = 0;
+  }
+
+  handleEvent(event) {
+    this[`on${event.type}`](event);
+  }
+
+  onblur(event) {
+    this._blurTimer = setTimeout(addHiddenAttribute, 400, this.popup);
+  }
+
+  onclick(event) {
+    event.preventDefault();
+    clearTimeout(this._blurTimer);
+    const el = event.target.closest('[role="option"]:not([aria-disabled="true"])');
+    addHiddenAttribute(this.popup);
+    if (el) {
+      const item = this.items[this.nodes.indexOf(el)];
+      const selected = !JSON.parse(el.getAttribute('aria-selected'));
+      this.setInfo(item, {selected});
+      el.setAttribute('aria-selected', selected);
+    }
+  }
+
+  onfocus(event) {
+    // if 0 or already cleared, nothing happens, really
+    clearTimeout(this._blurTimer);
+    // show the popup
+    this.popup.removeAttribute('hidden');
   }
 
   add(item) {
@@ -48,10 +89,12 @@ class Listbox {
       this.nodes[index] = li;
       // id is always needed to set aria-activedescendant
       li.id = this.id + '-' + index;
+      const info = this.getInfo(item);
       li.setAttribute('role', 'option');
-      li.setAttribute('aria-disabled', item.disabled);
-      li.textContent = item.value;
-      if (item.selected) {
+      li.setAttribute('aria-disabled', info.disabled);
+      li.setAttribute('aria-selected', info.selected);
+      li.textContent = info.value;
+      if (info.selected) {
         this.selectedItem = index;
         this.target.setAttribute('aria-activedescendant', li.id);
       }
@@ -67,6 +110,10 @@ class Listbox {
   }
 }
 
+function addHiddenAttribute(element) {
+  element.setAttribute('hidden', 'hidden');
+}
+
 
 document.addEventListener(
   'DOMContentLoaded',
@@ -74,6 +121,23 @@ document.addEventListener(
     new Listbox({
       target: '#testing',
       label: 'Select your language',
+      getInfo(item) {
+        return {
+          disabled: Math.random() < .2,
+          selected: !item.disabled,
+          get value() {
+            return item.value;
+          }
+        };
+      },
+      setInfo(item, info) {
+        if (info.hasOwnProperty('disabled')) {
+          item.disabled = info.disabled;
+        }
+        if (info.hasOwnProperty('selected')) {
+          item.selected = info.selected;
+        }
+      },
       items: [
         {
           "disabled": true,
