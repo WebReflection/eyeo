@@ -64,8 +64,8 @@
     this.onload = function () {
       const div = document.createElement('div');
       div.innerHTML = `
-        <p i18n="hello-a-${Math.random()}"></p>
-        <p i18n="hello-b-${Math.random()}"></p>
+        <p i18n="hello-after-${Math.random()}"></p>
+        <p i18n="hello-after-${Math.random()}"></p>
       `;
       document.body.appendChild(div);
     };
@@ -73,8 +73,8 @@
   </head>
   <body>
     <div>
-        <p i18n="hello-world"></p>
-        <p i18n="hello-there"></p>
+        <p i18n="hello-world-before"></p>
+        <p i18n="hello-there-before"></p>
     </div>
   </body>
 </html>
