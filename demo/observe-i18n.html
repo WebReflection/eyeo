@@ -46,6 +46,10 @@
           for (const node of record.addedNodes) {
             if (node.nodeType === 1) {
               if (node.hasAttribute('i18n')) {
+                // here we could do any kind of transforming
+                // through the json unique id
+                // we could even inject more nodes with i18n
+                // attributes and the observer will do the rest
                 node.textContent = node.getAttribute('i18n');
               } else {
                 populate([{addedNodes: node.children}]);
