@@ -19,38 +19,43 @@
     <script>
     const images = [];
     addEventListener('load', () => {
+      const rand = img => img.dataset.src + '&_=' + Math.random();
       const scrollTop = /(?:\?|&)scrollTop=(\d+)(?:&|$)/.test(location.search) ? RegExp.$1 : 0;
-      console.log('scroll to', scrollTop);
-      if (scrollTop > 0) {
-        const scroll = event => {
-          if (document.scrollingElement.scrollTop < scrollTop) {
-            document.scrollingElement.scrollTop = scrollTop;
-            console.log('current scroll', document.scrollingElement.scrollTop);
-            console.log('start', (new Date).toISOString());
-          } else {
-            removeEventListener(event.type, scroll);
-            console.log('end', (new Date).toISOString());
-          }
-        };
-        addEventListener('scroll', scroll);
-        scroll({});
-      }
-      const observer = new IntersectionObserver(
-        (entries, observer) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              console.log('observer', (new Date).toISOString());
-              const img = entry.target;
-              observer.unobserve(img);
-              img.src = img.dataset.src;
-              images.push(img.dataset.src);
-              console.log('images', images);
+      if (/(?:\?|&)ABP=true(?:&|$)/.test(location.search)) {
+        document.querySelectorAll('img').forEach(img => img.src = rand(img));
+      } else {
+        console.log('scroll to', scrollTop);
+        if (scrollTop > 0) {
+          const scroll = event => {
+            if (document.scrollingElement.scrollTop < scrollTop) {
+              document.scrollingElement.scrollTop = scrollTop;
+              console.log('current scroll', document.scrollingElement.scrollTop);
+              console.log('start', (new Date).toISOString());
+            } else {
+              removeEventListener(event.type, scroll);
+              console.log('end', (new Date).toISOString());
             }
-          });
-        },
-        {threshold: 1}
-      );
-      document.querySelectorAll('img').forEach(img => observer.observe(img));
+          };
+          addEventListener('scroll', scroll);
+          scroll({});
+        }
+        const observer = new IntersectionObserver(
+          (entries, observer) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                console.log('observer', (new Date).toISOString());
+                const img = entry.target;
+                observer.unobserve(img);
+                img.src = rand(img);
+                images.push(img.dataset.src);
+                console.log('images', images);
+              }
+            });
+          },
+          {threshold: 1}
+        );
+        document.querySelectorAll('img').forEach(img => observer.observe(img));
+      }
     }, {once: true});
     </script>
   </head>
