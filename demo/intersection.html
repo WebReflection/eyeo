@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Intersection Observer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+      body {
+        font-family: sans-serif;
+      }
+      p, img {
+        margin: auto;
+        max-width: 640px;
+      }
+      p:not(:first-child) {
+        margin-top: 16px;
+      }
+    </style>
+    <script>
+    const images = [];
+    addEventListener('load', () => {
+      const scrollTop = /(?:\?|&)scrollTop=(\d+)(?:&|$)/.test(location.search) ? RegExp.$1 : 0;
+      console.log('scroll to', scrollTop);
+      if (scrollTop > 0) {
+        const scroll = event => {
+          if (document.scrollingElement.scrollTop < scrollTop) {
+            document.scrollingElement.scrollTop = scrollTop;
+            console.log('current scroll', document.scrollingElement.scrollTop);
+            console.log('start', (new Date).toISOString());
+          } else {
+            removeEventListener(event.type, scroll);
+            console.log('end', (new Date).toISOString());
+          }
+        };
+        addEventListener('scroll', scroll);
+        scroll({});
+      }
+      const observer = new IntersectionObserver(
+        (entries, observer) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              console.log('observer', (new Date).toISOString());
+              const img = entry.target;
+              observer.unobserve(img);
+              img.src = img.dataset.src;
+              images.push(img.dataset.src);
+              console.log('images', images);
+            }
+          });
+        },
+        {threshold: 1}
+      );
+      document.querySelectorAll('img').forEach(img => observer.observe(img));
+    }, {once: true});
+    </script>
+  </head>
+  <body>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris eu lectus in sem pharetra sagittis a ut quam. Pellentesque orci dui, placerat eu tincidunt molestie, consequat et urna. Nullam nec velit eu nisl feugiat rhoncus. Aliquam libero eros, dapibus a venenatis ut, faucibus a nulla. Donec id sagittis lorem. Vivamus sed tortor vitae massa dictum tempor. Vestibulum feugiat mauris ac placerat tristique. Donec vel tellus id ipsum semper porttitor. Maecenas dignissim metus ipsum, et viverra dui vestibulum sed. Donec tincidunt eget dolor in tristique. Praesent ullamcorper sem id tincidunt faucibus. Aliquam erat volutpat. Integer in purus eget tellus interdum rhoncus eget eu massa. Nunc sagittis nibh a mauris porttitor congue. In cursus cursus neque, sit amet blandit dui tempus at.</p>
+    <p>Duis id magna in lorem vehicula pretium. Ut fermentum vitae ante a cursus. In ut rutrum ligula. Nam consequat ex quam, vitae sollicitudin nulla aliquet at. Nam rhoncus sagittis dolor in suscipit. Phasellus vel euismod nisl, vel egestas ex. In dictum sapien et tincidunt iaculis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.</p>
+    <p>In a justo quis neque tempus faucibus. Proin efficitur turpis vel orci aliquet tincidunt sollicitudin at turpis. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Sed gravida sapien egestas, consequat nisl id, pretium felis. Ut aliquam tincidunt elementum. Donec lorem orci, suscipit quis magna eget, tristique aliquam purus. Integer rhoncus feugiat diam eu ullamcorper. Aliquam iaculis, leo sit amet suscipit pretium, purus justo efficitur nisl, vitae luctus felis mi sed arcu. Phasellus fringilla sem sapien, vitae malesuada ipsum semper non. Aliquam lectus lacus, egestas id magna eget, pulvinar rutrum elit. Fusce nec cursus ligula. Duis leo tortor, ultricies vel facilisis sed, accumsan eget ipsum. Sed viverra lacus eu magna suscipit fringilla.</p>
+    <img data-src="../img/horse.jpg?image=1">
+    <p>Nunc fringilla turpis at augue pulvinar semper. Etiam mollis gravida nunc, eu aliquam dui convallis non. Vestibulum odio risus, varius in efficitur sit amet, hendrerit vitae dolor. Nulla id consectetur neque. Nulla porta eu dolor vel dignissim. Pellentesque tortor purus, gravida id cursus eget, dapibus et purus. Donec ipsum nulla, vehicula eu blandit et, ultricies ut magna. Donec eleifend neque ex, a imperdiet arcu imperdiet sed. Phasellus sollicitudin nulla rutrum varius tempor. Mauris sit amet diam sit amet velit euismod porta. Phasellus enim ante, fermentum eu dictum ac, suscipit in arcu. Pellentesque eget suscipit risus. Phasellus interdum leo sit amet aliquam dignissim.</p>
+    <p>Pellentesque ac metus sed odio semper rhoncus eu sit amet justo. Suspendisse et varius eros. Etiam quam velit, scelerisque ut enim at, viverra cursus purus. Sed eu nulla est. Pellentesque ac velit nibh. Integer et erat nec risus efficitur sagittis nec nec est. Aenean eleifend felis eget dolor cursus pulvinar. Suspendisse turpis tellus, tempus non tristique quis, pretium sit amet felis. Fusce ipsum sapien, dictum ac est vel, rhoncus congue quam.</p>
+    <p>Suspendisse pharetra urna quis congue viverra. Ut dictum leo urna, ut consectetur metus iaculis non. Fusce at neque ac mauris condimentum fringilla. Morbi eu semper mauris. Donec non ligula sit amet odio ultrices viverra vel sit amet dolor. Nullam pretium libero ut ligula feugiat convallis. Nullam scelerisque turpis nec massa eleifend finibus. Ut vitae condimentum lectus. Cras ut eros tellus. Vivamus a mi arcu.</p>
+    <img data-src="../img/horse.jpg?image=2">
+    <p>Ut a imperdiet ante, id congue quam. Integer a sapien turpis. Vestibulum fringilla luctus tortor, sit amet pretium purus dapibus at. Donec ultricies ultrices pellentesque. Mauris gravida urna ac nunc mattis, in mattis sem lacinia. Integer vitae sollicitudin risus, sed tempor urna. Vestibulum egestas fringilla condimentum. Aliquam non est faucibus enim ullamcorper ullamcorper. Morbi sit amet congue nulla. Maecenas nibh tortor, pulvinar sed metus sed, malesuada ullamcorper dui. Nullam mi lorem, commodo non egestas non, sagittis sed nisi. Pellentesque eget cursus diam. Nulla dignissim id lorem at ullamcorper. Vivamus vel enim ligula. Aliquam posuere magna felis.</p>
+    <p>Ut in efficitur mi. Etiam a eros nec quam mattis ullamcorper at non odio. Proin gravida, dui eu egestas iaculis, nibh nisi vulputate lectus, at interdum odio erat iaculis mi. Nunc quis velit dui. Vivamus pharetra nisi id ante consectetur, ac venenatis leo ultrices. Pellentesque sit amet tincidunt nisi. Pellentesque tempor ex id viverra ullamcorper. Aliquam vehicula posuere pellentesque. Phasellus ac purus eleifend ante efficitur commodo. Donec commodo enim non fringilla convallis. Sed gravida nulla at risus faucibus interdum. Proin commodo faucibus nunc, nec fringilla nunc tempus quis. Mauris tempus facilisis neque sed pharetra. Cras venenatis libero in lorem gravida, nec pharetra nunc pretium.</p>
+    <p>Proin suscipit lobortis justo vitae aliquet. Vestibulum aliquam mollis arcu ut fringilla. Quisque justo purus, semper vel leo non, elementum fringilla nisl. Donec in ornare risus. In lacinia convallis diam sed elementum. Donec hendrerit euismod lorem, quis fringilla turpis ultrices ut. Mauris lobortis quam at felis volutpat, eu volutpat neque blandit. Nunc sit amet risus quam. Maecenas pellentesque consectetur lacus, quis luctus dui blandit euismod. Nam varius, turpis ac ultricies volutpat, neque nulla consequat neque, ut varius risus urna quis enim. Mauris posuere tristique rutrum. Nunc aliquam hendrerit odio at varius.</p>
+    <img data-src="../img/horse.jpg?image=3">
+    <p>Donec nec odio ullamcorper, vulputate nibh in, suscipit odio. Morbi bibendum mi at interdum semper. Etiam sit amet velit et orci pharetra tincidunt eu eget magna. Donec ultricies, quam eget malesuada tempor, dolor turpis imperdiet nisi, non fermentum libero massa ac nisl. Sed sed placerat quam. Sed tortor dolor, tempus eu pharetra sit amet, tristique et massa. Mauris pulvinar dui non urna iaculis venenatis. Cras eu arcu urna. Sed vel posuere arcu. Sed iaculis ante in enim mollis rutrum.</p>
+    <p>Quisque volutpat feugiat porttitor. Cras id blandit felis. Duis eget placerat dui. Integer ut dapibus odio, in molestie mauris. Quisque sit amet turpis nulla. Morbi nec convallis nunc. Sed tempus neque a sapien ultrices, ac lobortis libero sagittis.</p>
+    <p>Donec non risus diam. Donec et ornare eros. Donec sit amet mattis ligula. Integer pulvinar dignissim mauris vitae efficitur. Duis facilisis nec ante eu viverra. Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis pharetra enim sed orci vestibulum scelerisque. Curabitur placerat nulla ex, at pellentesque ex viverra sit amet. Sed convallis ex vitae justo congue venenatis. Sed egestas nulla tortor, quis hendrerit diam scelerisque at. Quisque vulputate in enim ut fermentum. Mauris sit amet laoreet orci, imperdiet varius lacus. Suspendisse potenti. Donec hendrerit tellus odio, eu fermentum risus condimentum et. Nullam pellentesque leo tortor, vitae tempor massa vestibulum at.</p>
+    <img data-src="../img/horse.jpg?image=4">
+    <p>Vivamus dapibus eget lectus ac cursus. Proin ut orci dignissim, molestie mauris vel, tristique lorem. Nunc fringilla in odio a mattis. Nullam tempus metus varius dolor eleifend sollicitudin. Mauris rhoncus sapien massa, sit amet scelerisque sapien consequat nec. Aenean tristique nec lorem id dignissim. Mauris accumsan porttitor augue ac dictum. In volutpat velit vitae nunc mattis, id malesuada libero egestas. Praesent ullamcorper mattis odio, eu viverra felis mattis nec. Nunc porta libero et risus commodo, id dignissim nulla molestie. Ut augue quam, tincidunt interdum malesuada vitae, vehicula eget urna.</p>
+    <p>Aliquam erat volutpat. Nunc tempus feugiat enim, et imperdiet risus dictum sed. Duis gravida mi at elit interdum, sed rhoncus libero pellentesque. Etiam aliquam pharetra mauris a semper. Proin eu pulvinar nisi. Suspendisse ut ante ut purus ornare condimentum. Nam in ultricies nunc.</p>
+    <p>Donec sodales dui risus, non finibus lorem rhoncus vitae. Quisque nec mi vel dolor maximus sagittis vitae ac diam. Pellentesque placerat tempor accumsan. Nam eu mauris a magna commodo tristique. Suspendisse potenti. Vivamus venenatis congue sapien, eu euismod nisi porttitor eu. Integer ornare imperdiet turpis vulputate mattis. Duis porta tempor diam, at finibus ante suscipit eget. Nullam tempor porttitor sagittis. Aenean ornare consectetur sodales. Sed at condimentum nisi. Duis nulla ligula, porta sed massa eget, dapibus dictum sapien.</p>
+    <img data-src="../img/horse.jpg?image=5">
+    <p>Nulla nec orci justo. Pellentesque ut auctor justo. Aenean eu dui libero. Aenean eleifend auctor cursus. Nullam tempor ante id ipsum sodales consectetur. Vivamus suscipit massa lorem, quis vestibulum diam ultrices a. Duis ultricies porta augue ac placerat. Curabitur volutpat arcu ut odio aliquet, quis tristique massa consectetur. Sed id risus sollicitudin, suscipit nibh et, dictum nisi. Nulla scelerisque maximus libero luctus finibus. Donec tempus lorem neque, eu condimentum elit sollicitudin condimentum. Nunc at ipsum quis massa tempus porta nec ac urna. Proin et magna eu lacus vulputate dapibus. Fusce pulvinar turpis nec tellus pharetra, id egestas quam iaculis. Quisque laoreet eros orci, eget laoreet neque pretium ac. Duis volutpat, purus in tincidunt placerat, odio ipsum rhoncus felis, vel cursus sapien lacus eu augue.</p>
+    <p>Phasellus non mauris vitae nibh maximus semper ut ut dolor. Duis vel efficitur sem. Aliquam molestie justo libero, eget pellentesque risus porta dictum. Donec lorem tellus, egestas vitae ligula ac, tempor imperdiet lorem. Cras tincidunt laoreet massa, in convallis metus imperdiet quis. Duis et laoreet lacus. Nullam eleifend posuere neque in maximus. Phasellus sit amet lacus ornare, ultricies elit faucibus, fringilla elit. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae;</p>
+    <p>In eget interdum sapien, sodales scelerisque arcu. Fusce euismod sodales sapien pretium tincidunt. Ut hendrerit ullamcorper vulputate. Praesent nunc urna, dignissim sed dui eu, mattis commodo eros. Proin eu neque sed risus porttitor lobortis id feugiat dui. Aenean feugiat dolor massa, sit amet lobortis enim fermentum a. Nam suscipit urna porttitor mauris varius, sed finibus neque condimentum. Sed ullamcorper dui vel aliquet rutrum. Donec tempus, turpis ac lobortis iaculis, mi lectus malesuada enim, nec imperdiet sem tellus in nulla.</p>
+    <img data-src="../img/horse.jpg?image=6">
+    <p>Nulla mattis elit velit, venenatis porttitor elit lobortis eget. Curabitur eleifend ligula quis molestie mollis. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Fusce non ultricies elit, quis consectetur diam. Morbi dictum ante consectetur malesuada posuere. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec et neque eget justo cursus maximus nec ut mi. Vestibulum lacinia, velit nec pulvinar tristique, mi erat cursus elit, sed tempus tellus enim vitae erat. Donec dictum magna et tincidunt ornare. Curabitur quis tempus turpis.</p>
+    <p>Donec congue mattis metus, id tincidunt justo ultrices placerat. Praesent metus ligula, dignissim ac mauris eu, mattis consequat arcu. Mauris blandit est ante, cursus interdum nibh euismod quis. Nulla sed risus sed enim venenatis vulputate. Praesent faucibus nunc in elementum sagittis. In convallis nulla nec orci finibus porttitor id vel nibh. Fusce pretium lacus eu malesuada porttitor.</p>
+    <p>Etiam cursus sodales augue, ut tempus turpis consequat quis. Praesent viverra, sem vel bibendum fringilla, risus turpis porta sapien, ut vulputate metus felis id mauris. Donec tortor massa, pulvinar ac feugiat nec, posuere eu est. Maecenas purus nibh, consequat malesuada nisl non, eleifend tempus dolor. Nulla maximus dictum elit, at maximus risus suscipit et. Proin pulvinar, tortor nec finibus vehicula, lectus massa luctus elit, in posuere tellus felis eget mi. Pellentesque in ex facilisis, semper nulla et, cursus lorem. Maecenas id euismod nisi. Quisque ut volutpat justo. Mauris mollis nisl at nunc vestibulum, et vehicula felis egestas. Donec leo metus, dapibus ut elit et, auctor tempor mi. Duis pellentesque, sem sit amet ornare iaculis, massa leo lacinia lectus, quis ultricies magna sapien sit amet nunc. Nunc scelerisque sit amet odio quis mattis.</p>
+    <img data-src="../img/horse.jpg?image=7">
+    <p>Pellentesque tempor lobortis dui. Quisque ultrices purus eu maximus tempus. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nulla id turpis egestas, venenatis massa ac, rutrum turpis. Nam a arcu libero. Nunc semper, ipsum sit amet euismod fermentum, felis diam efficitur magna, quis ultrices lectus enim non purus. Morbi vulputate ac nulla pharetra lobortis. Donec gravida pharetra nibh, sed laoreet nisl malesuada et. Aenean molestie quis enim eu blandit. Vivamus non mollis libero, at euismod ex. Pellentesque ex magna, rhoncus et ultrices sit amet, ornare non felis. Proin aliquet semper egestas.</p>
+    <p>Integer vel elit vitae metus luctus molestie at ut neque. Aliquam erat volutpat. Nunc tempor, metus a porttitor tempus, libero massa tincidunt elit, nec viverra ex felis vel sapien. Nam orci enim, gravida quis efficitur id, tincidunt nec enim. Aliquam interdum volutpat pellentesque. Aliquam in turpis eu arcu elementum pellentesque. Vestibulum ac bibendum lorem. Sed mattis, felis vel vehicula tincidunt, leo urna fermentum leo, et pretium sapien urna eget lacus. Integer id dictum quam.</p>
+    <p>Interdum et malesuada fames ac ante ipsum primis in faucibus. Curabitur non dapibus augue, sodales egestas nibh. Ut sit amet pellentesque ipsum. Aenean a cursus arcu. Duis pretium diam libero. Proin sodales vitae dolor sed ornare. Proin et odio sit amet turpis fringilla ullamcorper. Aliquam erat volutpat. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent egestas nibh eu nulla dictum fringilla. Fusce id volutpat est. Ut ante ipsum, dapibus vitae augue non, pretium scelerisque nisl. Integer vitae ultricies justo.</p>
+  </body>
+</html>
