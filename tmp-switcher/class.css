@@ -33,6 +33,8 @@
   cursor: pointer;
 }
 
+
+
 [data-component="switcher"] button[aria-checked="false"]
 {
   background: #ca0000;
@@ -40,8 +42,20 @@
   transform: translateY(-14px) translateX(24px);
 }
 
+[data-component="switcher"] button[aria-checked="false"]:hover
+{
+  background: #b60000;
+  box-shadow: 0 4px 16px 0 #d3b0b0;
+}
+
 [data-component="switcher"] button[aria-checked="true"]
 {
   background: #07abef;
   box-shadow: 0 2px 4px 0 #a6cede;
+}
+
+[data-component="switcher"] button[aria-checked="true"]:hover
+{
+  background: #069ad7;
+  box-shadow: 0 4px 16px 0 #a6cede;
 }
