@@ -15,7 +15,7 @@ const KeyCode = {
   "DELETE": 46
 };
 
-class Listbox {
+class Listbox extends BaseComponment {
   /**
    * @param {*} details
    * details.target (as string or as element)
@@ -23,16 +23,14 @@ class Listbox {
    * details.label (a label to show)
    */
   constructor(details) {
+    super(details);
 
     // initial properties
     this.getInfo = details.getInfo;
     this.setInfo = details.setInfo;
-    this.id = 'listbox-' + ('' + Math.random()).replace(/\D/, '');
     this.items = [];
     this.nodes = [];
     this.hoveredIndex = 0;
-    this.target = typeof details.target === 'string' ?
-                  document.querySelector(details.target) : details.target;
     this.target.classList.add('listbox');
     this.text = {
       // details.label can be either an object or a string

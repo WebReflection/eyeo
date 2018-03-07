@@ -1,0 +1,47 @@
+[data-component="switcher"]
+{
+  display: inline-block;
+  width: 64px;
+  height: 12px;
+  border-radius: 5px;
+  background-color: #e4e4e4;
+  transform: translateY(14px);
+  margin-bottom: 26px;
+}
+
+[data-component="switcher"] button
+{
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  text-align: center;
+  transition: all .2s ease-out;
+  text-transform: uppercase;
+  user-select: none;
+  transform: translateY(-14px);
+  color: #fff;
+  outline: none;
+}
+
+[data-component="switcher"] button:focus
+{
+  border: 2px solid #87bffe;
+}
+
+[data-component="switcher"] button:hover
+{
+  cursor: pointer;
+}
+
+[data-component="switcher"] button[aria-checked="false"]
+{
+  background: #ca0000;
+  box-shadow: 0 2px 4px 0 #e5d1d1;
+  transform: translateY(-14px) translateX(24px);
+}
+
+[data-component="switcher"] button[aria-checked="true"]
+{
+  background: #07abef;
+  box-shadow: 0 2px 4px 0 #a6cede;
+}
