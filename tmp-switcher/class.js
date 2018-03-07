@@ -9,7 +9,7 @@ class Switcher extends BaseComponment {
     if (details.labelledby)
       this.button.setAttribute('aria-labelledby', details.labelledby);
     this.button.setAttribute('role', 'checkbox');
-    this.button.addEventListener('click', this);
+    this.target.addEventListener('click', this);
     this.update();
   }
   handleEvent() {
