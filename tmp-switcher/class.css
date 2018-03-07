@@ -33,8 +33,6 @@
   cursor: pointer;
 }
 
-
-
 [data-component="switcher"] button[aria-checked="false"]
 {
   background: #ca0000;
