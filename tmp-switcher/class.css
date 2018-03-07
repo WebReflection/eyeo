@@ -7,6 +7,7 @@
   background-color: #e4e4e4;
   transform: translateY(14px);
   margin-bottom: 26px;
+  cursor: pointer;
 }
 
 [data-component="switcher"] button
@@ -26,11 +27,6 @@
 [data-component="switcher"] button:focus
 {
   border: 2px solid #87bffe;
-}
-
-[data-component="switcher"] button:hover
-{
-  cursor: pointer;
 }
 
 [data-component="switcher"] button[aria-checked="false"]

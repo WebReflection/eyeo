@@ -14,6 +14,7 @@ class Switcher extends BaseComponment {
   }
   handleEvent() {
     this.checked = !this.checked;
+    this.button.focus();
     this.update();
     this.button.dispatchEvent(
       new CustomEvent('change', {
