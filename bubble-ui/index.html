@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <link rel="stylesheet" href="class.css">
+      <link rel="stylesheet" href="../bubble-card/class.css">
+      <link rel="stylesheet" href="../tmp-switcher/class.css">
+      <script src="../base-component.js"></script>
+      <script src="class.js"></script>
+      <script src="../bubble-card/class.js"></script>
+      <script src="../tmp-switcher/class.js"></script>
+      <style>
+      [data-component=bubble-ui] {
+        border: 1px solid #e6e6e6;
+      }
+      </style>
+  </head>
+  <body>
+    <div data-component="bubble-ui">
+      <header>
+        <span><img role="presentation" src="../img/logo.svg"></span>
+        <input type="image" src="../img/questionMark.svg">
+      </header>
+      <main>
+        <div class="control">
+          <div class="info">
+            <span>Adblocking enabled on:</span>
+            <strong>http://techcrunch.com/</strong>
+          </div>
+          <div data-component="switcher"></div>
+        </div>
+        <div class="switcher-options">
+          <p>
+            This is a whitelisted domain. Enable adblocking for this session only or remove it from the whitelist?
+          </p>
+          <button>this time only</button>
+          <button class="link">remove from whitelist</button>
+        </div>
+        <div class="details">
+          <div class="insights">
+            <span>Insights for:</span>
+            <button class="active">this domain</button>
+            <button>all time</button>
+          </div>
+          <div class="cards">
+            <div data-component="bubble-card" data-icon="blocked">
+              <span class="count"></span>
+              <span class="info">ads blocked</span>
+            </div>
+            <div data-component="bubble-card" data-icon="passed">
+              <span class="count"></span>
+              <span class="info">acceptable ads passed</span>
+            </div>
+          </div>
+        </div>
+      </main>
+      <footer>
+        <input type="image" src="../img/options-gray.svg">
+      </footer>
+    </div>
+  </body>
+</html>

@@ -4,6 +4,7 @@
   border: 1px solid #e6e6e6;
   box-shadow: 0 2px 4px 0 hsla(0, 0%, 84%, .5);
   border-radius: 4px;
+  background-color: #ffffff;
 }
 
 body:not([dir="rtl"]) [data-component="bubble-card"]

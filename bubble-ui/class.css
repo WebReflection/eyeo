@@ -1,0 +1,172 @@
+[data-component="bubble-ui"],
+[data-component="bubble-ui"] *,
+[data-component="bubble-ui"] *:before,
+[data-component="bubble-ui"] *:after
+{
+  font-family: sans-serif;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+[data-component="bubble-ui"] .control,
+[data-component="bubble-ui"] .details,
+[data-component="bubble-ui"] footer
+{
+  padding: 16px;
+}
+
+[data-component="bubble-ui"]
+{
+  width: 340px;
+  height: 405px;
+}
+
+[data-component="bubble-ui"] header
+{
+  display: flex;
+  height: 77px;
+  padding: 24px 16px;
+}
+
+[data-component="bubble-ui"] header *:not(input)
+{
+  flex-grow: 1;
+}
+
+[data-component="bubble-ui"] main
+{
+  height: 275px;
+  overflow: hidden;
+}
+
+[data-component="bubble-ui"] .control
+{
+  display: flex;
+}
+
+[data-component="bubble-ui"] .control .info
+{
+  flex-grow: 1;
+}
+
+[data-component="bubble-ui"] .control .info span
+{
+  color: #b3b3b3;
+}
+
+[data-component="bubble-ui"] .control [data-component="switcher"]
+{
+  min-width: 64px;
+}
+
+[data-component="bubble-ui"] .switcher-options
+{
+  margin: 0 16px;
+  padding-bottom: 1em;
+  border-top: 1px dotted silver;
+  overflow: hidden;
+  display: none;
+}
+
+[data-component="bubble-ui"] .switcher-options p
+{
+  padding-top: 16px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  opacity: .25;
+}
+
+[data-component="bubble-ui"] .switcher-options button
+{
+  border: 1px solid #07abef;
+  border-radius: 4px;
+  color: #07abef;
+  background: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 12px;
+  transition: all .2s ease-out;
+}
+
+[data-component="bubble-ui"] .switcher-options button.link
+{
+  border: 0;
+}
+
+[data-component="bubble-ui"] .switcher-options button.link:hover,
+[data-component="bubble-ui"] .switcher-options button.link:focus
+{
+  text-decoration: underline;
+}
+
+[data-component="bubble-ui"] .switcher-options button:not(.link):hover
+{
+  background: #07abef;
+  color: #fff;
+}
+
+[data-component="bubble-ui"] .details
+{
+  height: 100%;
+  background: #f8f8f8;
+  border-top: 1px solid #e6e6e6;
+}
+
+[data-component="bubble-ui"] .insights
+{
+  border-bottom: 1px solid #e6e6e6;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  color: #a0a0a0;
+  display: flex;
+}
+
+[data-component="bubble-ui"] .insights span
+{
+  flex-grow: 1;
+}
+
+[data-component="bubble-ui"] .insights button
+{
+  border: 0;
+  color: hsla(0,0%,63%,.6);
+  background: none;
+  transition: all .2s ease-out;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+[data-component="bubble-ui"] .insights button.active
+{
+  color: rgb(7, 171, 239);
+}
+
+[data-component="bubble-ui"] .insights button:not(.active):hover
+{
+  color: #a0a0a0;
+}
+
+[data-component="bubble-ui"] .insights button:first-of-type
+{
+  margin: 0 8px;
+}
+
+[data-component="bubble-ui"] footer
+{
+  text-align: right;
+}
+
+[data-component="bubble-ui"] header,
+[data-component="bubble-ui"] main
+{
+  border-bottom: 1px solid #e6e6e6;
+}
+
+[data-component="bubble-ui"] header input,
+[data-component="bubble-ui"] footer input
+{
+  opacity: .25;
+}
