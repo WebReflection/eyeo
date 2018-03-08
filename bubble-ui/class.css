@@ -62,11 +62,34 @@
 
 [data-component="bubble-ui"] .switcher-options
 {
+  height: 0;
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: all .2s ease-out;
+}
+
+[data-component="bubble-ui"] main.options .switcher-options
+{
+  height: 93px;
+  transform: scaleY(1);
+}
+
+[data-component="bubble-ui"] .details > div
+{
+  transition: all .2s ease-out;
+}
+
+[data-component="bubble-ui"] main.options .details > div
+{
+  filter: blur(5px);
+  transform: scale3d(.9, .9, .9);
+}
+
+[data-component="bubble-ui"] .switcher-options > div
+{
   margin: 0 16px;
   padding-bottom: 1em;
   border-top: 1px dotted silver;
-  overflow: hidden;
-  display: none;
 }
 
 [data-component="bubble-ui"] .switcher-options p
