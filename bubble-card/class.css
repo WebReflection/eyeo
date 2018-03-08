@@ -1,0 +1,57 @@
+[data-component="bubble-card"]
+{
+  padding: 16px;
+  border: 1px solid #e6e6e6;
+  box-shadow: 0 2px 4px 0 hsla(0, 0%, 84%, .5);
+  border-radius: 4px;
+}
+
+body:not([dir="rtl"]) [data-component="bubble-card"]
+{
+  padding-left: 40px;
+}
+
+body[dir="rtl"] [data-component="bubble-card"]
+{
+  padding-right: 40px;
+}
+
+[data-component="bubble-card"]:not(:first-child)
+{
+  margin-top: .5em;
+}
+
+[data-component="bubble-card"][data-icon]
+{
+  background-repeat: no-repeat;
+}
+
+body:not([dir="rtl"]) [data-component="bubble-card"][data-icon]
+{
+  background-position: 16px center;
+}
+
+body[dir="rtl"] [data-component="bubble-card"][data-icon]
+{
+  background-position: right 16px center;
+}
+
+[data-component="bubble-card"][data-icon="blocked"]
+{
+  background-image: url('../img/block.svg');
+}
+
+[data-component="bubble-card"][data-icon="passed"]
+{
+  background-image: url('../img/checkmark.svg');
+}
+
+[data-component="bubble-card"] .count
+{
+  font-weight: 600;
+}
+
+[data-component="bubble-card"] .info
+{
+  color: #a0a0a0;
+}

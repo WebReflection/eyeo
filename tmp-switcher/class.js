@@ -1,4 +1,4 @@
-class Switcher extends BaseComponment {
+class Switcher extends BaseComponent {
   constructor(details) {
     super(details);
     this.checked = !!details.checked;

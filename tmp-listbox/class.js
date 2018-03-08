@@ -15,7 +15,7 @@ const KeyCode = {
   "DELETE": 46
 };
 
-class Listbox extends BaseComponment {
+class Listbox extends BaseComponent {
   /**
    * @param {*} details
    * details.target (as string or as element)

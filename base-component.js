@@ -1,4 +1,4 @@
-class BaseComponment {
+class BaseComponent {
   constructor(details) {
     this.id = [
       this.constructor.name.toLowerCase(),

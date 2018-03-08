@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+  <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <link rel="stylesheet" href="class.css">
+      <script src="../base-component.js"></script>
+      <script src="class.js"></script>
+      <style>
+      * {
+        box-sizing: border-box;
+      }
+      .blurry {
+        border: 2px solid silver;
+        overflow: hidden;
+        transition: all .2s ease-out;
+        padding: 8px;
+        transform: scale3d(1, 1, 1);
+        filter: blur(0);
+
+        --height: auto;
+        height: var(--height);
+
+      }
+      .blurry.hidden {
+        transform: scale3d(.9, .9, .9);
+        filter: blur(5px);
+
+        --height: 50px;
+      }
+      </style>
+  </head>
+  <body>
+    <div class="outer">
+      <div class="blurry">
+        <div data-component="bubble-card" data-icon="blocked">
+          <span class="count"></span>
+          <span class="info">ads blocked</span>
+        </div>
+        <div data-component="bubble-card" data-icon="passed">
+          <span class="count"></span>
+          <span class="info">acceptable ads passed</span>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script>
+  setInterval(
+    function toggle(element) {
+      let height = element.dataset.height;
+      const style = element.style;
+      if (!height) {
+        height = element.offsetHeight + 'px';
+        element.dataset.height = height;
+        style.setProperty('--height', height);
+        setTimeout(toggle, 0, element);
+      } else {
+        element.classList.toggle('hidden');
+        if (element.classList.contains('hidden')) {
+          style.removeProperty('--height');
+        } else {
+          style.setProperty('--height', height);
+        }
+      }
+    },
+    3000,
+    document.querySelector('.blurry')
+  );
+  </script>
+</html>
