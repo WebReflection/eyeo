@@ -66,6 +66,8 @@
   transform: translateY(-16px) scaleY(.5);
   opacity: 0;
   transition: all .2s ease-out;
+  /* avoid interfering with the layout when closed */
+  pointer-events: none;
 }
 
 [data-component="bubble-ui"] main.options .switcher-options
@@ -73,17 +75,20 @@
   height: 93px;
   transform: translateY(0) scaleY(1);
   opacity: 1;
+  pointer-events: all;
 }
 
 [data-component="bubble-ui"] .details > div
 {
-  transition: all .2s ease-out;
+  transition: filter .2s ease-out, transform  .2s ease-out;
 }
 
 [data-component="bubble-ui"] main.options .details > div
 {
   filter: blur(5px);
   transform: scale3d(.9, .9, .9);
+  /* avoid being clickable once blurred */
+  pointer-events: none;
 }
 
 [data-component="bubble-ui"] .switcher-options > div
@@ -112,7 +117,8 @@
   text-transform: uppercase;
   font-weight: 600;
   font-size: 12px;
-  transition: all .2s ease-out;
+  transition: background .2s ease-out,
+              color .2s ease-out;
 }
 
 [data-component="bubble-ui"] .switcher-options button.link
@@ -158,7 +164,7 @@
   border: 0;
   color: hsla(0,0%,63%,.6);
   background: none;
-  transition: all .2s ease-out;
+  transition: color .2s ease-out;
   font-size: inherit;
   cursor: pointer;
 }
