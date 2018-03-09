@@ -18,7 +18,9 @@
   border-color: transparent;
   border-radius: 20px;
   text-align: center;
-  transition: all .2s ease-out;
+  transition: border .2s ease-out, box-shadow .2s ease-out,
+              transform .2s ease-out, width .2s ease-out;
+  will-change: border, box-shadow, transform, width;
   text-transform: uppercase;
   user-select: none;
   transform: translateY(-14px);
