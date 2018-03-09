@@ -39,6 +39,11 @@
   transform: translateY(-14px) translateX(24px);
 }
 
+body[dir="rtl"] [data-component="switcher"] button[aria-checked="false"]
+{
+  transform: translateY(-14px) translateX(-24px);
+}
+
 [data-component="switcher"] button[aria-checked="false"]:hover
 {
   background: #b60000;
@@ -61,4 +66,9 @@
 {
   transform: translateY(-14px);
   width: 64px;
+}
+
+body[dir="rtl"] [data-component="switcher"] button.full
+{
+  transform: translateY(-14px) translateX(0);
 }

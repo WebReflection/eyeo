@@ -183,6 +183,11 @@
   text-align: right;
 }
 
+body[dir="rtl"] [data-component="bubble-ui"] footer
+{
+  text-align: left;
+}
+
 [data-component="bubble-ui"] header,
 [data-component="bubble-ui"] main
 {
