@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+  <head>
+    <!-- proposal: we add these 2 script on top of every page -->
+    <script>this.Promise||document.write('<script src="https://unpkg.com/promise-pjs@1.1.3/promise-min.js"><\x2fscript>')</script>
+    <script>this.ready=new Promise(function($){document.addEventListener('DOMContentLoaded',$,{once:true})})</script>
+    <!-- so that every other script after can simply use ready.then(...) to bootstrap -->
+    <script>
+    ready.then(function () {
+      document.body.textContent = 'ready works';
+    });
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
