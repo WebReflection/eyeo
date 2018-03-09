@@ -24,6 +24,7 @@
   transform: translateY(-14px);
   color: #fff;
   outline: none;
+  cursor: pointer;
 }
 
 [data-component="switcher"] button:focus

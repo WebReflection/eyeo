@@ -63,15 +63,16 @@
 [data-component="bubble-ui"] .switcher-options
 {
   height: 0;
-  transform: scaleY(0);
-  transform-origin: top;
+  transform: translateY(-16px) scaleY(.5);
+  opacity: 0;
   transition: all .2s ease-out;
 }
 
 [data-component="bubble-ui"] main.options .switcher-options
 {
   height: 93px;
-  transform: scaleY(1);
+  transform: translateY(0) scaleY(1);
+  opacity: 1;
 }
 
 [data-component="bubble-ui"] .details > div
