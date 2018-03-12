@@ -7,6 +7,7 @@
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 [data-component="bubble-ui"] .control,
@@ -58,6 +59,7 @@
 [data-component="bubble-ui"] .control .info strong
 {
   display: inline-block;
+  margin-top: 4px;
   word-wrap: none;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -83,7 +85,7 @@
 
 [data-component="bubble-ui"] main.options .switcher-options
 {
-  height: 93px;
+  height: 97px;
   transform: translateY(0) scaleY(1);
   opacity: 1;
   pointer-events: all;
