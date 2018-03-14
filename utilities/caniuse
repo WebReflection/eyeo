@@ -1,13 +1,21 @@
 #!/usr/bin/env node
 
-var browsers = [
+var caniuse, browsers = [
   'chrome 49',
   'edge 15',
   'firefox 51',
   'opera 36'
 ].join(', ');
 
-var caniuse = require('caniuse-api');
+try {
+  caniuse = require('caniuse-api');
+} catch(e) {
+  console.log('module \x1B[1mcaniuse-api\x1B[0m not found');
+  console.log('please install it via:');
+  console.log('  npm i -g caniuse-api');
+  process.exit(1);
+}
+
 switch (process.argv.length) {
   case 3:
     var found = [].concat(caniuse.find(process.argv[2]));
@@ -17,5 +25,6 @@ switch (process.argv.length) {
     if (found.length < 1) console.log('I have no idea');
     break;
   default:
-    console.log('you need to specify a feature');
+  console.log('you need to specify a feature name, example:');
+  console.log('  caniuse class');
 }
