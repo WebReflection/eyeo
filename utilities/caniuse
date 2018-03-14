@@ -1,30 +1,47 @@
 #!/usr/bin/env node
 
-var caniuse, browsers = [
-  'chrome 49',
-  'edge 15',
-  'firefox 51',
-  'opera 36'
-].join(', ');
+console.log('');
+
+var caniuse, browsers;
+var argv = process.argv.slice(0);
+var i = argv.indexOf('--browsers')
+if (-1 < i) {
+  browsers = argv.splice(i, 2)[1].split(',').map(function(browser) {
+    return browser.toLowerCase().replace('=', ' ');
+  }).join(', ');
+} else {
+  browsers = [
+    'chrome 49',
+    'edge 15',
+    'firefox 51',
+    'opera 36'
+  ].join(', ');
+}
 
 try {
   caniuse = require('caniuse-api');
 } catch(e) {
   console.log('module \x1B[1mcaniuse-api\x1B[0m not found');
-  console.log('please install it via:');
+  console.log('please install it globally via:');
   console.log('  npm i -g caniuse-api');
   process.exit(1);
 }
 
-switch (process.argv.length) {
+switch (argv.length) {
   case 3:
-    var found = [].concat(caniuse.find(process.argv[2]));
+    console.log(browsers);
+    console.log('-'.repeat(browsers.length));
+    var found = [].concat(caniuse.find(argv[2]));
     found.forEach(function (feature) {
       console.log(feature + ': ' + (caniuse.isSupported(feature, browsers) ? '🍾 \x1B[1myup\x1B[0m 🎉' : 'nope'));
     });
-    if (found.length < 1) console.log('I have no idea');
+    if (found.length < 1) console.log(argv[2] + ' not found');
     break;
   default:
   console.log('you need to specify a feature name, example:');
   console.log('  caniuse class');
+  console.log('you can optionally specify browsers');
+  console.log('  caniuse class --browsers chrome=56,edge=16');
 }
+
+console.log('');
