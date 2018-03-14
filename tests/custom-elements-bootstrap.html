@@ -1,20 +1,14 @@
 <!doctype html>
 <html>
   <head>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/document-register-element/1.7.2/document-register-element.js"></script>
+    <script>if(!this.customElements)document.write('<script src="//cdnjs.cloudflare.com/ajax/libs/document-register-element/1.7.2/document-register-element.js"></'+'script>')</script>
+    <script defer src="io-nav-before.js"></script>
     <script>
-      customElements.define('io-nav-before', class extends HTMLElement {
-        connectedCallback() {
-          this.tabs = this.querySelectorAll('io-tab');
-          console.log(this.tabs);
-          console.log(this.outerHTML);
-        }
-      });
-      customElements.define('io-tab', class extends HTMLElement {
-        connectedCallback() {
-          this.owner = this.parentNode;
-        }
-      });
+    customElements.define('io-tab', class extends HTMLElement {
+      connectedCallback() {
+        this.owner = this.parentNode;
+      }
+    });
     </script>
   </head>
   <body>
@@ -29,24 +23,21 @@
       <io-tab>three</io-tab>
     </io-nav-after>
   </body>
+  <script defer src="io-nav-after.js"></script>
   <script>
-    customElements.define('io-nav-after', class extends HTMLElement {
-      connectedCallback() {
-        this.tabs = this.querySelectorAll('io-tab');
-        console.log(this.tabs);
-        console.log(this.outerHTML);
-      }
-    });
-  </script>
-  <script>
-  this.onload = function () {
-    document.body.appendChild(document.createElement('div')).innerHTML =
-      `<io-nav-before>
-      <io-tab>one</io-tab>
-      <io-tab>two</io-tab>
-      <io-tab>three</io-tab>
-    </io-nav-before>`;
-  };
+  addEventListener('DOMContentLoaded', () => {
+    document.body.appendChild(document.createElement('div')).innerHTML = `
+    <io-nav-bafore>
+      <io-tab>one onload</io-tab>
+      <io-tab>two onload</io-tab>
+      <io-tab>three onload</io-tab>
+    </io-nav-bafore>
+    <io-nav-after>
+      <io-tab>one onload</io-tab>
+      <io-tab>two onload</io-tab>
+      <io-tab>three onload</io-tab>
+    </io-nav-after>`;
+  });
   </script>
 </html>
 
