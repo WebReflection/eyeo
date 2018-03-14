@@ -4,38 +4,38 @@
     <script>
     customElements.define('but-why', class extends HTMLElement {
 
-      static get observedAttributes() {
-        return ['because'];
-      }
+      static get observedAttributes() { return ['because']; }
 
       constructor() {
+        super();
         document.body.appendChild(
           document.createElement('p')
-        ).textContent = `constructor: ${this.children.lengt}`;
+        ).textContent = `constructor: ${this.children.length}`;
+
         addEventListener('DOMContentLoaded', () => {
           document.body.appendChild(
             document.createElement('p')
-          ).textContent = `load: ${this.children.lengt}`;
+          ).textContent = `ready: ${this.children.length}`;
         });
       }
 
-      attributeChangeCallback() {
+      attributeChangedCallback() {
         document.body.appendChild(
           document.createElement('p')
-        ).textContent = `attributeChangeCallback: ${this.children.lengt}`;
+        ).textContent = `attributeChangedCallback: ${this.children.length}`;
       }
 
       connectedCallback() {
         document.body.appendChild(
           document.createElement('p')
-        ).textContent = `connectedCallback: ${this.children.lengt}`;
+        ).textContent = `connectedCallback: ${this.children.length}`;
       }
 
     });
     </script>
   </head>
   <body>
-    <but-why>
+    <but-why because=123>
       <p>a</p>
       <p>b</p>
       <p>c</p>
