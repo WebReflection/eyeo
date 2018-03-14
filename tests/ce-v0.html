@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <script>
+    document.registerElement('but-why', {
+      prototype: Object.create(
+        HTMLElement.prototype, {
+        createdCallback: {value() {
+          document.body.appendChild(
+            document.createElement('p')
+          ).textContent = `createdCallback: ${this.children.length}`;
+        }},
+        attachedCallback: {value() {
+          document.body.appendChild(
+            document.createElement('p')
+          ).textContent = `attachedCallback: ${this.children.length}`;
+        }},
+        attributeChangedCallback: {value(
+          name, previousValue, value
+        ) {
+          document.body.appendChild(
+            document.createElement('p')
+          ).textContent = `attributeChangedCallback: ${this.children.length}`;
+        }}
+      })
+    });
+    addEventListener('DOMContentLoaded', () => {
+      document.body.appendChild(
+        document.createElement('p')
+      ).textContent = `ready: ${document.querySelector('but-why').children.length}`;
+    });
+    </script>
+  </head>
+  <body>
+    <but-why because=123>
+      <p>a</p>
+      <p>b</p>
+      <p>c</p>
+    </but-why>
+  </body>
+</html>
