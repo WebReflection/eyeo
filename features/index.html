@@ -113,6 +113,9 @@
         if (!NodeList.prototype[Symbol.iterator])
           throw new Error('nope');
       },
+      function mutationObserver() {
+        new MutationObserver(function () {});
+      },
       function shadowDom() {
         if (!document.body.attachShadow)
           throw new Error('nope');
