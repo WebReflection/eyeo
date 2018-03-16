@@ -95,6 +95,9 @@
         if (document.body.closest('body') !== document.body)
           throw new Error('closest not working as standard');
       },
+      function customElementsV1() {
+        customElements.define('io-test', class extends HTMLElement {});
+      },
       function iterableNodeLists() {
         if (!NodeList.prototype[Symbol.iterator])
           throw new Error('nope');
@@ -126,6 +129,7 @@
         if (
           !('flex-grow' in document.body.style) &&
           !('-ms-flex-positive' in document.body.style) &&
+          !('-ms-flex-grow' in document.body.style) &&
           !('-webkit-flex-grow' in document.body.style) &&
           !('-moz-flex-grow' in document.body.style)
         ) throw new Error('nope');
