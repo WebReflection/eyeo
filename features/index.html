@@ -102,6 +102,10 @@
         if (!NodeList.prototype[Symbol.iterator])
           throw new Error('nope');
       },
+      function shadowDom() {
+        if (!document.body.attachShadow)
+          throw new Error('nope');
+      },
       function template() {
         var t = document.createElement('template');
         t.innerHTML = '<td>OK</td>';
@@ -119,6 +123,7 @@
         document.write('<label><input onclick="event.preventDefault()" type=checkbox checked=checked> ' + name + '</label>');
       } catch(e) {
         document.write('<label><input onclick="event.preventDefault()" type=checkbox> ' + name + '</label>');
+        if (e.message !== 'nope') console.warn(e);
       }
     });
   
