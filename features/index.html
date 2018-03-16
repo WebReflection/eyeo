@@ -70,9 +70,9 @@ document.write('<h6>all checks uses sloppy mode</h6><hr>');
   });
   try {
     test();
-    document.write('<label><input type=checkbox checked=checked> ' + name + '</label>');
+    document.write('<label><input onclick="event.preventDefault()" type=checkbox checked=checked> ' + name + '</label>');
   } catch(e) {
-    document.write('<label><input type=checkbox> ' + name + '</label>');
+    document.write('<label><input onclick="event.preventDefault()" type=checkbox> ' + name + '</label>');
   }
 });
 
@@ -101,9 +101,9 @@ document.write('<h6>there are fallbacks if not supported</h6><hr>');
   });
   try {
     test();
-    document.write('<label><input type=checkbox checked=checked> ' + name + '</label>');
+    document.write('<label><input onclick="event.preventDefault()" type=checkbox checked=checked> ' + name + '</label>');
   } catch(e) {
-    document.write('<label><input type=checkbox> ' + name + '</label>');
+    document.write('<label><input onclick="event.preventDefault()" type=checkbox> ' + name + '</label>');
   }
 });
 
@@ -145,10 +145,9 @@ document.write('<h6>we use SASS when necessary</h6><hr>');
   });
   try {
     test();
-    document.write('<label><input type=checkbox checked=checked> ' + name + '</label>');
+    document.write('<label><input onclick="event.preventDefault()" type=checkbox checked=checked> ' + name + '</label>');
   } catch(e) {
-    document.write('<label><input type=checkbox> ' + name + '</label>');
+    document.write('<label><input onclick="event.preventDefault()" type=checkbox> ' + name + '</label>');
   }
 });
-
 </script>
