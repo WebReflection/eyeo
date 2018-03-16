@@ -84,6 +84,7 @@
         document.write('<label><input onclick="event.preventDefault()" type=checkbox checked=checked> ' + name + '</label>');
       } catch(e) {
         document.write('<label><input onclick="event.preventDefault()" type=checkbox> ' + name + '</label>');
+        if (e.message !== 'nope') console.warn(e);
       }
     });
   
@@ -168,8 +169,8 @@
         test();
         document.write('<label><input onclick="event.preventDefault()" type=checkbox checked=checked> ' + name + '</label>');
       } catch(e) {
-        if (e.message !== 'nope') console.log(e);
         document.write('<label><input onclick="event.preventDefault()" type=checkbox> ' + name + '</label>');
+        if (e.message !== 'nope') console.warn(e);
       }
     });
   
