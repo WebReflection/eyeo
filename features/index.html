@@ -27,6 +27,9 @@ document.write('<h6>all checks uses sloppy mode</h6><hr>');
   function arrowFunctions() {
     eval('var arrow = () => {};');
   },
+  function asyncAndAwait() {
+    eval('(async function () { await Promise.resolve(456); })();');
+  },
   function classes() {
     eval('class A {}');
   },
