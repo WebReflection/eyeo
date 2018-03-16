@@ -1,0 +1,154 @@
+<!doctype html>
+<title>ABP ES features</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body {
+    font-family: sans-serif;
+    --variable: 100;
+  }
+  body:after {
+    content: '';
+    height: 8px;
+    --bg: silver;
+    background-color: var(--bg);
+    display: block;
+    margin-top: 8px;
+  }
+  h1 { font-size: 1em; }
+  h6 { font-weight: normal; }
+  h1, h6 { margin: 0 auto; }
+  label { display: block; }
+</style>
+<script>
+document.write('<h1>' + document.title + '</h1>');
+document.write('<h6>all checks uses sloppy mode</h6><hr>');
+[
+  function arrowFunctions() {
+    eval('var arrow = () => {};');
+  },
+  function classes() {
+    eval('class A {}');
+  },
+  function constants() {
+    eval('const a = 123;');
+  },
+  function forOf() {
+    eval('for (var v of [1,2,3]);');
+  },
+  function generators() {
+    eval('(function* gen() { yield Math.random(); }()).next().value;');
+  },
+  function lets() {
+    eval('let a = 123;');
+  },
+  function mixins() {
+    var m = {}, o = {};
+    m[Symbol.hasInstance] = function (value) {
+      return value === o;
+    };
+    if (!(o instanceof m)) throw new Error('nope');
+  },
+  function promises() {
+    Promise.resolve(true);
+  },
+  function symbols() {
+    var s = Symbol();
+  },
+  function templateLiterals() {
+    eval('var s = `a${Math.random()}c`;');
+  },
+  function weakReferences() {
+    var wm = new WeakMap;
+    var ws = new WeakSet;
+  }
+]
+  .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+  .forEach(function (test) {
+  var name = test.name.replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
+    return $1 + ' ' + $2.toLowerCase();
+  });
+  try {
+    test();
+    document.write('<label><input type=checkbox checked=checked> ' + name + '</label>');
+  } catch(e) {
+    document.write('<label><input type=checkbox> ' + name + '</label>');
+  }
+});
+
+document.write('<br><h1>' + document.title.replace('ES', 'DOM') + '</h1>');
+document.write('<h6>there are fallbacks if not supported</h6><hr>');
+[
+  function closest() {
+    if (document.body.closest('body') !== document.body)
+      throw new Error('nope');
+  },
+  function iterableNodeLists() {
+    if (!NodeList.prototype[Symbol.iterator])
+      throw new Error('nope');
+  },
+  function template() {
+    var t = document.createElement('template');
+    t.innerHTML = '<td>OK</td>';
+    if (t.content.firstChild.textContent !== 'OK')
+      throw new Error('nope');
+  }
+]
+  .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+  .forEach(function (test) {
+  var name = test.name.replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
+    return $1 + ' ' + $2.toLowerCase();
+  });
+  try {
+    test();
+    document.write('<label><input type=checkbox checked=checked> ' + name + '</label>');
+  } catch(e) {
+    document.write('<label><input type=checkbox> ' + name + '</label>');
+  }
+});
+
+document.write('<br><h1>' + document.title.replace('ES', 'CSS') + '</h1>');
+document.write('<h6>we use SASS when necessary</h6><hr>');
+[
+  function flex() {
+    if (
+      !('flex-grow' in document.body.style) &&
+      !('-ms-flex-positive' in document.body.style) &&
+      !('-webkit-flex-grow' in document.body.style) &&
+      !('-moz-flex-grow' in document.body.style)
+    ) throw new Error('nope');
+  },
+  function grid() {
+    if (!('grid-template-areas' in document.body.style))
+      throw new Error('nope');
+  },
+  function pseudoVariables() {
+    if (!getComputedStyle(document.body, ':after').getPropertyValue('--bg'))
+      throw new Error('nope');
+  },
+  function readableVariables() {
+    var readable = getComputedStyle(document.body, null).getPropertyValue('--variable') == 100;
+    if (!readable) {
+      throw new Error('nope');
+    }
+  },
+  function writableVariables() {
+    document.body.style.setProperty('--variable', 200);
+    if (getComputedStyle(document.body, null).getPropertyValue('--variable') != 200)
+      throw new Error('nope');
+  }
+]
+  .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+  .forEach(function (test) {
+  var name = test.name.replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
+    return $1 + ' ' + $2.toLowerCase();
+  });
+  try {
+    test();
+    document.write('<label><input type=checkbox checked=checked> ' + name + '</label>');
+  } catch(e) {
+    document.write('<label><input type=checkbox> ' + name + '</label>');
+  }
+});
+
+</script>
