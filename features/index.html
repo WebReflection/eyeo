@@ -63,6 +63,16 @@
       function promises() {
         Promise.resolve(true);
       },
+      function proxies() {
+        if (true !== new Proxy(
+          {value: true},
+          {
+            get: function(target, name) {
+              return target[name];
+            }
+          }
+        )) throw new Error('nope');
+      },
       function symbols() {
         var s = Symbol();
       },
