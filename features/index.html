@@ -30,10 +30,10 @@
       eval('var arrow = () => {};');
     },
     function asyncAndAwait() {
-      eval('(async function () { await Promise.resolve(456); })();');
+      var value = eval('(async function () { await Promise.resolve(456); })();');
     },
     function classes() {
-      eval('class A {}');
+      var A = eval('class A {}');
     },
     function constants() {
       eval('const a = 123;');
@@ -42,17 +42,18 @@
       eval('for (var v of [1,2,3]);');
     },
     function generators() {
-      eval('(function* gen() { yield Math.random(); }()).next().value;');
+      var value = eval('(function* gen() { yield Math.random(); }()).next().value;');
     },
     function lets() {
       eval('let a = 123;');
     },
     function mixins() {
+      if (!Symbol.hasInstance) throw new Error('no Symbol.hasInstance');
       var m = {}, o = {};
       m[Symbol.hasInstance] = function (value) {
         return value === o;
       };
-      if (!(o instanceof m)) throw new Error('nope');
+      if (!(o instanceof m)) throw new Error('Symbol.hasInstance not working');
     },
     function promises() {
       Promise.resolve(true);
@@ -85,8 +86,9 @@
   document.write('<h6>there are fallbacks if not supported</h6><hr>');
   [
     function closest() {
+      if (!document.body.closest) throw new Error('no Element.closest');
       if (document.body.closest('body') !== document.body)
-        throw new Error('nope');
+        throw new Error('closest not working as standard');
     },
     function iterableNodeLists() {
       if (!NodeList.prototype[Symbol.iterator])
