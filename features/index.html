@@ -71,7 +71,7 @@
               return target[name];
             }
           }
-        )) throw new Error('nope');
+        ).value) throw new Error('nope');
       },
       function symbols() {
         var s = Symbol();
