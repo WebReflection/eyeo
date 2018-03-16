@@ -12,7 +12,7 @@ if (-1 < i) {
 } else {
   browsers = [
     'chrome 49',
-    'edge 15',
+    'edge 16',
     'firefox 51',
     'opera 36'
   ].join(', ');
