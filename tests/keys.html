@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <script>
+    // based on:
+    // https://docs.google.com/spreadsheets/d/1R3TQolar_E1J-X2OMaQjYQtjx-F3NGx09y_hkv_tNZI/edit#gid=0
+
+    // maps all codes to a method name
+    const keyMap = {
+      ctrlKey: {
+        shiftKey: {
+          F3: 'onPreviousSearchResult',
+          KeyT: 'onUpdateAll'
+        },
+        ArrowUp: 'onMoveUp',
+        ArrowDown: 'onMoveDown',
+        KeyA: 'onSelectAll',
+        KeyC: 'onCopy',
+        KeyE: 'onSave',
+        KeyF: 'onSearchBar',
+        KeyI: 'onImport',
+        KeyR: 'onFilters',
+        KeyT: 'onUpdate',
+        KeyV: 'onPaste',
+        KeyX: 'onCut'
+      },
+      Delete: 'onDelete',
+      F2: 'onEdit',
+      F3: 'onNextSearchResult',
+      Insert: 'onInsert'
+    };
+    // copy names with same behavior
+    keyMap.metaKey = keyMap.ctrlKey;
+    keyMap.Backspace = keyMap.Delete;
+    keyMap.ctrlKey.KeyG = keyMap.F3;
+    keyMap.ctrlKey.shiftKey.KeyG = keyMap.ctrlKey.shiftKey.F3;
+
+    // handle all keyboard events per target/element
+    class IOKeyboardShortcut {
+      constructor(details) {
+        this._details = details;
+        this._details.target.addEventListener('keydown', this);
+      }
+      cancel() {
+        this._details.target.removeEventListener('keydown', this);
+      }
+      handleEvent(event) {
+        let map = keyMap;
+        if (map.hasOwnProperty(event.code)) {
+          this._invokeMethod(event, map[event.code]);
+        } else if (event.ctrlKey || event.metaKey) {
+          map = map.ctrlKey;
+          if (map.hasOwnProperty(event.code)) {
+            this._invokeMethod(event, map[event.code]);
+          } else if (event.shiftKey) {
+            map = map.shiftKey;
+            if (map.hasOwnProperty(event.code)) {
+              this._invokeMethod(event, map[event.code]);
+            }
+          }
+        }
+      }
+      _invokeMethod(event, method) {
+        event.preventDefault();
+        if (typeof this._details[method] === 'function') {
+          this._details[method](event);
+        }
+        // TODO: remove this
+        else {
+          document.body.textContent = method;
+        }
+      }
+    }
+
+    // example, using the document.body
+    this.onload = function () {
+      new IOKeyboardShortcut({
+        target: document.activeElement
+      });
+    };
+    </script>
+  </head>
+  <body></body>
+</html>
