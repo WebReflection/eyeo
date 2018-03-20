@@ -7,24 +7,37 @@
 
     // maps all codes to a method name
     const keyMap = {
+      // returns the right name for specific cases with [FN] pressed
+      key(event) {
+        if (event.location > 0) {
+          switch (event.key) {
+            case 'Enter': return 'Insert';
+            case 'Backspace': return 'Delete';
+          }
+        }
+        return event.key;
+      },
+      // maps ctrlKey combo
       ctrlKey: {
+        // maps ctrlKey + shiftKey combos
         shiftKey: {
           F3: 'onPreviousSearchResult',
-          KeyR: 'onUpdateAll'
+          r: 'onUpdateAll'
         },
         ArrowUp: 'onMoveUp',
         ArrowDown: 'onMoveDown',
-        KeyA: 'onSelectAll',
-        KeyC: 'onCopy',
-        KeyE: 'onExport',
-        KeyF: 'onSearchBar',
-        KeyI: 'onImport',
-        KeyP: 'onPanel',  // should toggle filters pane
-        KeyR: 'onUpdate',
-        KeyS: 'onSave',
-        KeyV: 'onPaste',
-        KeyX: 'onCut'
+        a: 'onSelectAll',
+        c: 'onCopy',
+        e: 'onExport',
+        f: 'onSearchBar',
+        i: 'onImport',
+        p: 'onPanel',  // should toggle filters pane
+        r: 'onUpdate',
+        s: 'onSave',
+        v: 'onPaste',
+        x: 'onCut'
       },
+      // maps keys right away
       Delete: 'onDelete',
       F2: 'onEdit',
       F3: 'onNextSearchResult',
@@ -34,16 +47,12 @@
     const copy = Object.assign({}, keyMap);
 
     // copy names with same behavior
-    keyMap.ctrlKey.KeyG = keyMap.F3;
-    keyMap.ctrlKey.shiftKey.KeyG = keyMap.ctrlKey.shiftKey.F3;
-
-    // fix macOS vs others inconsistencies
     keyMap.metaKey = keyMap.ctrlKey;
-    keyMap.Backspace = keyMap.Delete;
-    keyMap.NumpadEnter = keyMap.Insert;
+    keyMap.ctrlKey.g = keyMap.F3;
+    keyMap.ctrlKey.shiftKey.g = keyMap.ctrlKey.shiftKey.F3;
 
     // handle all keyboard events per target/element
-    class IOKeyboardShortcut {
+    class KeyboardShortcuts {
       constructor(details) {
         this._details = details;
         this._details.target.addEventListener('keydown', this);
@@ -55,14 +64,15 @@
         this[`on${event.type}`](event);
       }
       onkeydown(event) {
-        const map = event.shiftKey ?
+        const ctrl = event.ctrlKey || event.metaKey;
+        const key = event.key === 'Enter' && event.location > 0 ?
+                      'Insert' : event.key;
+        const map = ctrl && event.shiftKey ?
           keyMap.ctrlKey.shiftKey :
-          ((event.ctrlKey || event.metaKey) ?
-            keyMap.ctrlKey :
-            keyMap);
-        if (map.hasOwnProperty(event.code)) {
+          (ctrl ? keyMap.ctrlKey : keyMap);
+        if (map.hasOwnProperty(key)) {
           event.preventDefault();
-          const method = map[event.code];
+          const method = map[key];
           if (typeof this._details[method] === 'function') {
             this._details[method](event);
           }
@@ -76,7 +86,7 @@
 
     // example, using the document.body
     this.onload = function () {
-      new IOKeyboardShortcut({
+      new KeyboardShortcuts({
         target: document.activeElement
       });
     };
