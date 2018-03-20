@@ -43,6 +43,11 @@
       function constants() {
         eval('const a = 123;');
       },
+      function defaultParameters() {
+        if (eval('(function(a = 123){ return a; })()') !== 123) {
+          throw new Error('nope');
+        }
+      },
       function forOf() {
         eval('for (var v of [1,2,3]);');
       },
