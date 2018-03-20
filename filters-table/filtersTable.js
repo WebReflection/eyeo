@@ -142,6 +142,7 @@ const filtersTable = (view, filters, readOnly) => {
       i++;
     }
     updateTable(render, sort, newList);
+    // update scrollTop
     view.scrollTop = state.scroll.top % state.tr.height;
     scroll.scrollTop = state.scroll.top;
     // fix possible tbody offset

@@ -169,6 +169,16 @@
     document.write('</div><div><h1>' + document.title.replace('ES', 'CSS') + '</h1>');
     document.write('<h6>we use SASS when necessary</h6><hr>');
     [
+      function calc() {
+        var reset = 'display:block;padding:0;margin:0;';
+        var el = document.createElement('test-calc');
+        el.style.cssText = reset + 'width:100px;';
+        el.appendChild(document.createElement('test-calc'));
+        el.firstChild.style.cssText = reset + 'width:calc(100% - 10px);';
+        document.body.insertBefore(el, document.body.firstChild);
+        if (!/90/.test(getComputedStyle(el.firstChild, null).getPropertyValue('width')))
+          throw new Error('nope');
+      },
       function flex() {
         if (
           !('flex-grow' in document.body.style) &&

@@ -17,9 +17,9 @@
 
 .filters-table
 {
-  border: 1px solid silver;
+  border: 1px solid #9b9b9b;
   box-sizing: border-box;
-  height: 208px;
+  height: 368px;
 }
 
 .filters-table *
