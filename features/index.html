@@ -58,8 +58,13 @@
       function constants() {
         eval('const a = 123;');
       },
-      function defaultParameters() {
+      function defaultParams() {
         if (eval('(function(a = 123){ return a; })()') !== 123) {
+          throw new Error('nope');
+        }
+      },
+      function defaultParamsBefore() {
+        if (eval('(function(a = 1, b){ return a + b; })(void 0, 2)') !== 3) {
           throw new Error('nope');
         }
       },
