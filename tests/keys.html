@@ -10,17 +10,18 @@
       ctrlKey: {
         shiftKey: {
           F3: 'onPreviousSearchResult',
-          KeyT: 'onUpdateAll'
+          KeyR: 'onUpdateAll'
         },
         ArrowUp: 'onMoveUp',
         ArrowDown: 'onMoveDown',
         KeyA: 'onSelectAll',
         KeyC: 'onCopy',
-        KeyE: 'onSave',
+        KeyE: 'onExport',
         KeyF: 'onSearchBar',
         KeyI: 'onImport',
-        KeyR: 'onFilters',
-        KeyT: 'onUpdate',
+        KeyP: 'onPanel',  // should toggle filters pane
+        KeyR: 'onUpdate',
+        KeyS: 'onSave',
         KeyV: 'onPaste',
         KeyX: 'onCut'
       },
@@ -29,11 +30,17 @@
       F3: 'onNextSearchResult',
       Insert: 'onInsert'
     };
+
+    const copy = Object.assign({}, keyMap);
+
     // copy names with same behavior
-    keyMap.metaKey = keyMap.ctrlKey;
-    keyMap.Backspace = keyMap.Delete;
     keyMap.ctrlKey.KeyG = keyMap.F3;
     keyMap.ctrlKey.shiftKey.KeyG = keyMap.ctrlKey.shiftKey.F3;
+
+    // fix macOS vs others inconsistencies
+    keyMap.metaKey = keyMap.ctrlKey;
+    keyMap.Backspace = keyMap.Delete;
+    keyMap.NumpadEnter = keyMap.Insert;
 
     // handle all keyboard events per target/element
     class IOKeyboardShortcut {
@@ -45,29 +52,24 @@
         this._details.target.removeEventListener('keydown', this);
       }
       handleEvent(event) {
-        let map = keyMap;
-        if (map.hasOwnProperty(event.code)) {
-          this._invokeMethod(event, map[event.code]);
-        } else if (event.ctrlKey || event.metaKey) {
-          map = map.ctrlKey;
-          if (map.hasOwnProperty(event.code)) {
-            this._invokeMethod(event, map[event.code]);
-          } else if (event.shiftKey) {
-            map = map.shiftKey;
-            if (map.hasOwnProperty(event.code)) {
-              this._invokeMethod(event, map[event.code]);
-            }
-          }
-        }
+        this[`on${event.type}`](event);
       }
-      _invokeMethod(event, method) {
-        event.preventDefault();
-        if (typeof this._details[method] === 'function') {
-          this._details[method](event);
-        }
-        // TODO: remove this
-        else {
-          document.body.textContent = method;
+      onkeydown(event) {
+        const map = event.shiftKey ?
+          keyMap.ctrlKey.shiftKey :
+          ((event.ctrlKey || event.metaKey) ?
+            keyMap.ctrlKey :
+            keyMap);
+        if (map.hasOwnProperty(event.code)) {
+          event.preventDefault();
+          const method = map[event.code];
+          if (typeof this._details[method] === 'function') {
+            this._details[method](event);
+          }
+          // TODO: remove this
+          else {
+            document.body.firstChild.textContent = method;
+          }
         }
       }
     }
@@ -80,5 +82,7 @@
     };
     </script>
   </head>
-  <body></body>
+  <body><div>&nbsp;</div><pre><script>
+  document.write(JSON.stringify(copy, null, '  '))
+  </script></pre></body>
 </html>
