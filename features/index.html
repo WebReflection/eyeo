@@ -23,12 +23,27 @@
       h6 { font-weight: normal; }
       h1, h6 { margin: 0 auto; }
       label { display: block; }
+      div {
+        min-width: 220px;
+        margin-bottom: 8px;
+        float: left;
+      }
+      hr.last {
+        clear: left;
+      }
     </style>
   </head>
   <body><script>
+  if (![].forEach) Array.prototype.forEach = function (fn, ctx) {
+    for (var i = 0; i < this.length; i++)
+      fn.call(ctx, this[i], i, this);
+  };
+  if (!this.console) this.console = {warn: function() {}};
   (function () {"use strict";
-  
-    document.write('<h1>' + document.title + '</h1>');
+    function getName(fn) {
+      return fn.name || String(fn).replace(/^\s*function\s+([^(]+?)\s*\([\S\s]+$/, '$1');
+    }
+    document.write('<div><h1>' + document.title + '</h1>');
     document.write('<h6>all checks done in strict mode</h6><hr>');
     [
       function arrowFunctions() {
@@ -89,9 +104,9 @@
         var ws = new WeakSet;
       }
     ]
-      .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+      .sort(function (a, b) { return getName(a) < getName(b) ? -1 : 1; })
       .forEach(function (test) {
-      var name = test.name.replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
+      var name = getName(test).replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
         return $1 + ' ' + $2.toLowerCase();
       });
       try {
@@ -102,8 +117,8 @@
         if (e.message !== 'nope') console.warn(e);
       }
     });
-  
-    document.write('<br><h1>' + document.title.replace('ES', 'DOM') + '</h1>');
+
+    document.write('</div><div><h1>' + document.title.replace('ES', 'DOM') + '</h1>');
     document.write('<h6>there are fallbacks if not supported</h6><hr>');
     [
       function closest() {
@@ -112,7 +127,7 @@
           throw new Error('closest not working as standard');
       },
       function customElementsV1() {
-        customElements.define('io-test', class extends HTMLElement {});
+        eval('customElements.define("io-test", class extends HTMLElement {})');
       },
       function iterableNodeLists() {
         if (!NodeList.prototype[Symbol.iterator])
@@ -132,9 +147,9 @@
           throw new Error('nope');
       }
     ]
-      .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+      .sort(function (a, b) { return getName(a) < getName(b) ? -1 : 1; })
       .forEach(function (test) {
-      var name = test.name.replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
+      var name = getName(test).replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
         return $1 + ' ' + $2.toLowerCase();
       });
       try {
@@ -145,8 +160,8 @@
         if (e.message !== 'nope') console.warn(e);
       }
     });
-  
-    document.write('<br><h1>' + document.title.replace('ES', 'CSS') + '</h1>');
+
+    document.write('</div><div><h1>' + document.title.replace('ES', 'CSS') + '</h1>');
     document.write('<h6>we use SASS when necessary</h6><hr>');
     [
       function flex() {
@@ -178,9 +193,9 @@
           throw new Error('nope');
       }
     ]
-      .sort(function (a, b) { return a.name < b.name ? -1 : 1; })
+      .sort(function (a, b) { return getName(a) < getName(b) ? -1 : 1; })
       .forEach(function (test) {
-      var name = test.name.replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
+      var name = getName(test).replace(/([a-z])([A-Z])/g, function ($0, $1, $2) {
         return $1 + ' ' + $2.toLowerCase();
       });
       try {
@@ -191,8 +206,8 @@
         if (e.message !== 'nope') console.warn(e);
       }
     });
-  
-    document.write('<br><hr><small>' + navigator.userAgent + '</small>');
+
+    document.write('</div><hr class="last"><small>' + navigator.userAgent + '</small>');
   }());
   </script></body>
 </html>
