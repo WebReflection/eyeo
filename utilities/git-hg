@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Requirements
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # This bash script assumes you have a clone
 # of adblockplusui into ~/mercurial/adblockplusui
 # To make it work you need to make this an executable
