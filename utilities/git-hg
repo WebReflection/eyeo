@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# Requirements
+# This bash script assumes you have a clone
+# of adblockplusui into ~/mercurial/adblockplusui
+# To make it work you need to make this an executable
+#   chmod a+x git-hg
+# and make it reachable via git command
+#   sudo mv git-hg /usr/local/bin/
+# To have clean commits/patches, once you create the first
+# commit in your branch, always `git commit --amend` before
+# using this tool.
+# This tool is setup to fail ASAP if an error occurs.
+# Please note merge conflicts are not resolved automatically.
+
 # get out as soon as there is an error
 set -e
 
