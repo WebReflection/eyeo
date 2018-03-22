@@ -53,10 +53,8 @@ updateHG() {
 }
 
 mergeHG() {
-  local CODEREVIEW=""
   local COMMIT="$(git log -1 --pretty=%B)"
   local BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-  read -p 'Code review number? ' CODEREVIEW
   REV="$(cut ~/issues/$BRANCH/revision)"
   git format-patch master --stdout > ~/issues/$BRANCH/git.patch
   cd ~/mercurial/adblockplusui
