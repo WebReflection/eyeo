@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+# get out as soon as there is an error
+set -e
+
+# it *SHOULD* normalize pbcopy - might fail on Wayland
+if [ "$(which pbcopy 2> /dev/null)" = "" ]; then
+  alias pbcopy='xclip -selection clipboard'
+fi
+
+cleanHG() {
+  hg update -C
+  hg purge
+  hg pull
+  hg checkout default
+  hg bookmark master
+}
+
+createHG() {
+  local COMMIT="$(git log -1 --pretty=%B)"
+  local BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  mkdir -p ~/issues/$BRANCH/
+  git format-patch master --stdout > ~/issues/$BRANCH/git.patch
+  cd ~/mercurial/adblockplusui
+  cleanHG
+  REV="$(hg log -r . -T "{rev}" | grep [0-9])"
+  REV="${REV:2}"
+  mkdir -p ~/issues/$BRANCH/
+  echo "$REV" >> ~/issues/$BRANCH/revision
+  echo "Revision: $(tput bold)$REV$(tput sgr0)"
+  echo "Copied: $(tput bold)$COMMIT$(tput sgr0)"
+  echo "$COMMIT" | pbcopy
+  sleep 3
+  hg import --no-commit ~/issues/$BRANCH/git.patch
+  hg status
+  upload.py --verbose --oauth2 -s codereview.adblockplus.org
+  cd -
+}
+
+updateHG() {
+  local CODEREVIEW=""
+  local BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  local REV="$(cut ~/issues/$BRANCH/revision)"
+  read -p 'Code review number? ' CODEREVIEW
+  git format-patch master --stdout > ~/issues/$BRANCH/git.patch
+  cd ~/mercurial/adblockplusui
+  hg update -r $REV -C
+  hg purge
+  hg import --no-commit ~/issues/$BRANCH/git.patch
+  hg status
+  upload.py --verbose --oauth2 -s codereview.adblockplus.org --rev $REV -i $CODEREVIEW
+  cd -
+}
+
+mergeHG() {
+  local CODEREVIEW=""
+  local COMMIT="$(git log -1 --pretty=%B)"
+  local BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  read -p 'Code review number? ' CODEREVIEW
+  REV="$(cut ~/issues/$BRANCH/revision)"
+  git format-patch master --stdout > ~/issues/$BRANCH/git.patch
+  cd ~/mercurial/adblockplusui
+  cleanHG
+  hg import --no-commit ~/issues/$BRANCH/git.patch
+  hg commit -m "$COMMIT"
+  hg push -r master
+}
+
+if [ "$1" = "create" ]; then
+  createHG
+elif [ "$1" = "update" ]; then
+  updateHG
+elif [ "$1" = "merge" ]; then
+  mergeHG
+else
+  echo "$(tput bold)Usage$(tput sgr0)";
+  echo '  git hg create';
+  echo '  git hg update';
+  echo '  git hg merge';
+fi
