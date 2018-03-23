@@ -54,7 +54,7 @@ createHG() {
 updateHG() {
   local CODEREVIEW=""
   local BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-  local REV="$(cut ~/issues/$BRANCH/revision)"
+  local REV="$(cat ~/issues/$BRANCH/revision)"
   read -p 'Code review number? ' CODEREVIEW
   git format-patch master --stdout > ~/issues/$BRANCH/git.patch
   cd ~/mercurial/adblockplusui
