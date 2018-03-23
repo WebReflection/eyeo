@@ -15,15 +15,17 @@
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
 io-toggle {
+  --width: 30px;
+  --height: 8px;
+  --translateY: -4px;
+  --translateX: 14px;
   display: inline-block;
-  display: inline-block;
-  width: 30px;
-  height: 8px;
+  width: var(--width);
+  height: var(--height);
   border-radius: 4px;
   background-color: #9b9b9b;
   transition: background .2s ease-out;
   will-change: background;
-  transform: translateY(4px);
   cursor: pointer; }
 
 io-toggle[checked] {
@@ -34,14 +36,14 @@ io-toggle[disabled] {
   cursor: default; }
 
 io-toggle button {
-  width: 16px;
-  height: 16px;
+  width: calc(var(--height) * 2);
+  height: calc(var(--height) * 2);
   padding: 0;
   border: 2px solid #e1e0e1;
-  border-radius: 8px;
+  border-radius: var(--height);
   transition: border .2s ease-out, box-shadow .2s ease-out, transform .2s ease-out, width .2s ease-out;
   will-change: border, box-shadow, transform, width;
-  transform: translateY(-4px);
+  transform: translateY(var(--translateY));
   outline: none;
   cursor: pointer; }
 
@@ -56,7 +58,7 @@ io-toggle button[aria-checked="true"] {
   background-color: #059cd0;
   border: 2px solid #059cd0;
   box-shadow: 0 1px 2px 0 #a6cede;
-  transform: translateY(-4px) translateX(14px); }
+  transform: translateY(var(--translateY)) translateX(var(--translateX)); }
 
 io-toggle button[aria-checked="true"]:hover {
   box-shadow: 0 2px 4px 0 #a6cede; }
@@ -68,9 +70,9 @@ io-toggle button[aria-checked="true"]:focus {
 /* in case we will need to switch active/disabled direction
 body[dir="rtl"] io-toggle button[aria-checked="true"]
 {
-  transform: translateY(-4px) translateX(-14px);
+  transform: translateY(var(--translateY)) translateX(calc(var(--translateX) * -1));
 }
-*/
+//*/
 html {
   font-size: 16px; }
 
