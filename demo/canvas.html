@@ -13,7 +13,6 @@
       border: 1px solid black; /* TODO: remove */
     }
     canvas.active {
-      touch-action: auto;
       pointer-events: all;
     }
     button.active {
@@ -43,9 +42,11 @@
     <button>erase</button>
     <hr>
     <canvas></canvas>
+    <p></p>
     <script>
     const [highlight, erase] = document.querySelectorAll('button');
     const canvas = document.querySelector('canvas');
+    const log = document.querySelector('p');
     let active = null;
     highlight.onclick = erase.onclick = function () {
       if (this === active) {
@@ -91,6 +92,7 @@
           this.ctx.strokeStyle = 'rgb(255,0,0)';
           this.ctx.fillStyle = 'rgb(0,0,0)';
           this.start = {x: e.layerX, y: e.layerY};
+          log.textContent = 'down ' + JSON.stringify(this.start);
         }
       },
       onpointermove(e) {
@@ -104,6 +106,7 @@
             e.layerX - this.start.x,
             e.layerY - this.start.y
           );
+          log.textContent = 'move ' + JSON.stringify({x: e.layerX - this.start.x, y: e.layerY - this.start.y});
         }
       },
       onpointerup(e) {
@@ -136,6 +139,7 @@
                   }}"
                 />`
           };
+          log.textContent = 'done ' + JSON.stringify(info.end);
           this.paths.push(info);
           document.body.appendChild(info.closer);
         }
