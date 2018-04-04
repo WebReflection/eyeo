@@ -36,6 +36,141 @@
       font-size: 11px;
     }
     </style>
+    <script>
+    const getCoordinates = event => {
+      let el = event.currentTarget;
+      let x = 0;
+      let y = 0;
+      do {
+        x += el.offsetLeft - el.scrollLeft;
+        y += el.offsetTop - el.scrollTop;
+      } while (
+        (el = el.offsetParent) &&
+        !isNaN(el.offsetLeft) &&
+        !isNaN(el.offsetTop)
+      );
+      return {x: event.clientX - x, y: event.clientY - y};
+    };
+
+    this.onload = function () {'use strict';
+      const buttons = document.querySelectorAll('button');
+      const highlight = buttons[0];
+      const erase = buttons[1];
+      const canvas = document.querySelector('canvas');
+      const log = document.querySelector('p');
+      let active = null;
+      highlight.onclick = erase.onclick = function () {
+        if (this === active) {
+          this.classList.remove('active');
+          canvas.classList.remove('active');
+          active = null;
+        } else {
+          if (active) active.classList.remove('active');
+          this.classList.add('active');
+          canvas.classList.add('active');
+          active = this;
+        }
+      };
+  
+      const stop = e => {
+        e.preventDefault();
+        e.stopPropagation();
+      };
+  
+      const handler = {
+        paths: [],
+        handleEvent(e) {
+          this[`on${e.type}`](e);
+        },
+        draw() {
+          this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (const info of this.paths) {
+            const method = `${info.type}Rect`;
+            this.ctx[method](
+              info.start.x,
+              info.start.y,
+              info.end.x,
+              info.end.y
+            );
+          }
+        },
+        onpointerdown(e) {
+          if (!this.drawing) {
+            stop(e);
+            this.drawing = true;
+            this.ctx = canvas.getContext('2d');
+            this.ctx.lineWidth = 10;
+            this.ctx.strokeStyle = 'rgb(255,0,0)';
+            this.ctx.fillStyle = 'rgb(0,0,0)';
+            this.start = getCoordinates(e);
+            log.textContent = 'down ' + JSON.stringify(this.start);
+          }
+        },
+        onpointermove(e) {
+          if (this.drawing) {
+            stop(e);
+            this.draw();
+            const method = `${active === highlight ? 'stroke' : 'fill'}Rect`;
+            const coords = getCoordinates(e);
+            this.ctx[method](
+              this.start.x,
+              this.start.y,
+              coords.x - this.start.x,
+              coords.y - this.start.y
+            );
+            log.textContent = 'move ' + JSON.stringify({x: coords.x - this.start.x, y: coords.y - this.start.y});
+          }
+        },
+        onpointerup(e) {
+          if (this.drawing) {
+            stop(e);
+            this.drawing = false;
+            const coords = getCoordinates(e);
+            // get out of here if the mouse didn't move at all
+            if (this.start.x === coords.x && this.start.y === coords.y)
+              return;
+            const end = {x: coords.x - this.start.x, y: coords.y - this.start.y};
+            const info = {
+              type: active === highlight ? 'stroke' : 'fill',
+              start: this.start,
+              end: end,
+              closer: hyperHTML.wire()`
+                  <span
+                    class="close"
+                    onclick="${event => {
+                      stop(event);
+                      document.body.removeChild(event.currentTarget);
+                      this.paths.splice(this.paths.indexOf(info), 1);
+                      this.draw();
+                    }}"
+                    style="${{
+                      position: 'absolute',
+                      top: e.pageY + 'px',
+                      left: e.pageX + 'px'
+                    }}"
+                  />`
+            };
+            log.textContent = 'done ' + JSON.stringify(info.end);
+            this.paths.push(info);
+            document.body.appendChild(info.closer);
+          }
+        }
+      };
+  
+      if ('onpointerup' in canvas) {
+        canvas.addEventListener('pointerdown', handler, {passive: false});
+        canvas.addEventListener('pointermove', handler, {passive: false});
+        canvas.addEventListener('pointerup', handler, {passive: false});
+      } else {
+        handler.onmousedown = handler.onpointerdown;
+        handler.onmousemove = handler.onpointermove;
+        handler.onmouseup = handler.onpointerup;
+        canvas.addEventListener('mousedown', handler, {passive: false});
+        canvas.addEventListener('mousemove', handler, {passive: false});
+        canvas.addEventListener('mouseup', handler, {passive: false});
+      }
+    };
+    </script>
   </head>
   <body>
     <button>highlight</button>
@@ -43,121 +178,5 @@
     <hr>
     <canvas></canvas>
     <p></p>
-    <script>
-    const [highlight, erase] = document.querySelectorAll('button');
-    const canvas = document.querySelector('canvas');
-    const log = document.querySelector('p');
-    let active = null;
-    highlight.onclick = erase.onclick = function () {
-      if (this === active) {
-        this.classList.remove('active');
-        canvas.classList.remove('active');
-        active = null;
-      } else {
-        if (active) active.classList.remove('active');
-        this.classList.add('active');
-        canvas.classList.add('active');
-        active = this;
-      }
-    };
-
-    const stop = e => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const handler = {
-      paths: [],
-      handleEvent(e) {
-        this[`on${e.type}`](e);
-      },
-      draw() {
-        this.ctx.clearRect(0, 0, canvas.width, canvas.height);
-        for (const info of this.paths) {
-          const method = `${info.type}Rect`;
-          this.ctx[method](
-            info.start.x,
-            info.start.y,
-            info.end.x,
-            info.end.y
-          );
-        }
-      },
-      onpointerdown(e) {
-        if (!this.drawing) {
-          stop(e);
-          this.drawing = true;
-          this.ctx = canvas.getContext('2d');
-          this.ctx.lineWidth = 10;
-          this.ctx.strokeStyle = 'rgb(255,0,0)';
-          this.ctx.fillStyle = 'rgb(0,0,0)';
-          this.start = {x: e.layerX, y: e.layerY};
-          log.textContent = 'down ' + JSON.stringify(this.start);
-        }
-      },
-      onpointermove(e) {
-        if (this.drawing) {
-          stop(e);
-          this.draw();
-          const method = `${active === highlight ? 'stroke' : 'fill'}Rect`;
-          this.ctx[method](
-            this.start.x,
-            this.start.y,
-            e.layerX - this.start.x,
-            e.layerY - this.start.y
-          );
-          log.textContent = 'move ' + JSON.stringify({x: e.layerX - this.start.x, y: e.layerY - this.start.y});
-        }
-      },
-      onpointerup(e) {
-        if (this.drawing) {
-          stop(e);
-          this.drawing = false;
-          // get out of here if the mouse didn't move at all
-          if (this.start.x === e.layerX && this.start.y === e.layerY)
-            return;
-          const info = {
-            type: active === highlight ? 'stroke' : 'fill',
-            start: this.start,
-            end: {
-              x: e.layerX - this.start.x,
-              y: e.layerY - this.start.y
-            },
-            closer: hyperHTML.wire()`
-                <span
-                  class="close"
-                  onclick="${event => {
-                    stop(event);
-                    document.body.removeChild(event.currentTarget);
-                    this.paths.splice(this.paths.indexOf(info), 1);
-                    this.draw();
-                  }}"
-                  style="${{
-                    position: 'absolute',
-                    top: e.pageY + 'px',
-                    left: e.pageX + 'px'
-                  }}"
-                />`
-          };
-          log.textContent = 'done ' + JSON.stringify(info.end);
-          this.paths.push(info);
-          document.body.appendChild(info.closer);
-        }
-      }
-    };
-
-    if ('onpointerup' in canvas) {
-      canvas.addEventListener('pointerdown', handler, {passive: false});
-      canvas.addEventListener('pointermove', handler, {passive: false});
-      canvas.addEventListener('pointerup', handler, {passive: false});
-    } else {
-      handler.onmousedown = handler.onpointerdown;
-      handler.onmousemove = handler.onpointermove;
-      handler.onmouseup = handler.onpointerup;
-      canvas.addEventListener('mousedown', handler, {passive: false});
-      canvas.addEventListener('mousemove', handler, {passive: false});
-      canvas.addEventListener('mouseup', handler, {passive: false});
-    }
-    </script>
   </body>
 </html>
