@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <head>
+    <title>canvas highlighter</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <script src="https://unpkg.com/hyperhtml"></script>
+    <style>
+    canvas {
+      user-select: none;
+      touch-action: none;
+      pointer-events: none;
+      border: 1px solid black; /* TODO: remove */
+    }
+    canvas.active {
+      touch-action: auto;
+      pointer-events: all;
+    }
+    button.active {
+      background-color: lightblue;
+    }
+    span.close {
+      display: block;
+      width: 20px;
+      height: 20px;
+      border-radius: 20px;
+      background-color: black;
+    }
+    span.close:before {
+      content: 'X';
+      display: block;
+      font-weight: bold;
+      line-height: 20px;
+      text-align: center;
+      color: white;
+      font-family: sans-serif;
+      font-size: 11px;
+    }
+    </style>
+  </head>
+  <body>
+    <button>highlight</button>
+    <button>erase</button>
+    <hr>
+    <canvas></canvas>
+    <script>
+    const [highlight, erase] = document.querySelectorAll('button');
+    const canvas = document.querySelector('canvas');
+    let active = null;
+    highlight.onclick = erase.onclick = function () {
+      if (this === active) {
+        this.classList.remove('active');
+        canvas.classList.remove('active');
+        active = null;
+      } else {
+        if (active) active.classList.remove('active');
+        this.classList.add('active');
+        canvas.classList.add('active');
+        active = this;
+      }
+    };
+    const handler = {
+      paths: [],
+      handleEvent(e) {
+        this[`on${e.type}`](e);
+      },
+      draw() {
+        this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const info of this.paths) {
+          const method = `${info.type}Rect`;
+          this.ctx[method](
+            info.start.x,
+            info.start.y,
+            info.end.x,
+            info.end.y
+          );
+        }
+      },
+      onpointerdown(e) {
+        if (!this.drawing) {
+          e.preventDefault();
+          this.drawing = true;
+          this.ctx = canvas.getContext('2d');
+          this.ctx.lineWidth = 10;
+          this.ctx.strokeStyle = 'rgb(255,0,0)';
+          this.ctx.fillStyle = 'rgb(0,0,0)';
+          this.start = {x: e.layerX, y: e.layerY};
+        }
+      },
+      onpointermove(e) {
+        if (this.drawing) {
+          e.preventDefault();
+          this.draw();
+          const method = `${active === highlight ? 'stroke' : 'fill'}Rect`;
+          this.ctx[method](
+            this.start.x,
+            this.start.y,
+            e.layerX - this.start.x,
+            e.layerY - this.start.y
+          );
+        }
+      },
+      onpointerup(e) {
+        if (this.drawing) {
+          e.preventDefault();
+          this.drawing = false;
+          // get out of here if the mouse didn't move at all
+          if (this.start.x === e.layerX && this.start.y === e.layerY)
+            return;
+          const info = {
+            type: active === highlight ? 'stroke' : 'fill',
+            start: this.start,
+            end: {
+              x: e.layerX - this.start.x,
+              y: e.layerY - this.start.y
+            },
+            closer: hyperHTML.wire()`
+                <span
+                  class="close"
+                  onclick="${event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    document.body.removeChild(event.currentTarget);
+                    this.paths.splice(this.paths.indexOf(info), 1);
+                    this.draw();
+                  }}"
+                  style="${{
+                    position: 'absolute',
+                    top: e.pageY + 'px',
+                    left: e.pageX + 'px'
+                  }}"
+                />`
+          };
+          this.paths.push(info);
+          document.body.appendChild(info.closer);
+        }
+      }
+    };
+    for (const key in handler) {
+      canvas.addEventListener(key.slice(2), handler, {passive: false});
+    }
+    </script>
+  </body>
+</html>
