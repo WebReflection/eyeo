@@ -146,10 +146,18 @@
       }
     };
 
-    for (const key in handler) {
-      canvas.addEventListener(key.slice(2), handler, {passive: false});
+    if ('onpointerup' in canvas) {
+      canvas.addEventListener('pointerdown', handler, {passive: false});
+      canvas.addEventListener('pointermove', handler, {passive: false});
+      canvas.addEventListener('pointerup', handler, {passive: false});
+    } else {
+      handler.onmousedown = handler.onpointerdown;
+      handler.onmousemove = handler.onpointermove;
+      handler.onmouseup = handler.onpointerup;
+      canvas.addEventListener('mousedown', handler, {passive: false});
+      canvas.addEventListener('mousemove', handler, {passive: false});
+      canvas.addEventListener('mouseup', handler, {passive: false});
     }
-
     </script>
   </body>
 </html>
