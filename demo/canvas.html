@@ -59,6 +59,12 @@
         active = this;
       }
     };
+
+    const stop = e => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
     const handler = {
       paths: [],
       handleEvent(e) {
@@ -78,7 +84,7 @@
       },
       onpointerdown(e) {
         if (!this.drawing) {
-          e.preventDefault();
+          stop(e);
           this.drawing = true;
           this.ctx = canvas.getContext('2d');
           this.ctx.lineWidth = 10;
@@ -89,7 +95,7 @@
       },
       onpointermove(e) {
         if (this.drawing) {
-          e.preventDefault();
+          stop(e);
           this.draw();
           const method = `${active === highlight ? 'stroke' : 'fill'}Rect`;
           this.ctx[method](
@@ -102,7 +108,7 @@
       },
       onpointerup(e) {
         if (this.drawing) {
-          e.preventDefault();
+          stop(e);
           this.drawing = false;
           // get out of here if the mouse didn't move at all
           if (this.start.x === e.layerX && this.start.y === e.layerY)
@@ -118,8 +124,7 @@
                 <span
                   class="close"
                   onclick="${event => {
-                    event.preventDefault();
-                    event.stopPropagation();
+                    stop(event);
                     document.body.removeChild(event.currentTarget);
                     this.paths.splice(this.paths.indexOf(info), 1);
                     this.draw();
@@ -136,9 +141,11 @@
         }
       }
     };
+
     for (const key in handler) {
       canvas.addEventListener(key.slice(2), handler, {passive: false});
     }
+
     </script>
   </body>
 </html>
