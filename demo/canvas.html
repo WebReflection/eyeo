@@ -6,10 +6,15 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <script src="https://unpkg.com/hyperhtml"></script>
     <style>
+    *, *:before, *:after {
+      box-sizing: border-box;
+    }
     canvas {
       user-select: none;
       touch-action: none;
       pointer-events: none;
+      width: 100%;
+      height: 80vh;
       border: 1px solid black; /* TODO: remove */
     }
     canvas.active {
@@ -19,24 +24,40 @@
       background-color: lightblue;
     }
     span.close {
+      position: absolute;
       display: block;
-      width: 20px;
-      height: 20px;
-      border-radius: 20px;
-      background-color: black;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      border-radius: 24px;
+      transform: translateX(-12px) translateY(-12px);
+      background-color: #4a4a4a;
+    }
+    span.close:before,
+    span.close:after {
+      position: absolute;
+      top: 6px;
+      left: 12px;
+      content: ' ';
+      display: block;
+      width: 1px;
+      height: 12px;
+      background: #fefefe;
     }
     span.close:before {
-      content: 'X';
-      display: block;
-      font-weight: bold;
-      line-height: 20px;
-      text-align: center;
-      color: white;
-      font-family: sans-serif;
-      font-size: 11px;
+      transform: rotate(45deg);
+    }
+    span.close:after {
+      transform: rotate(-45deg);
     }
     </style>
     <script>
+    const getPageCoordinates = (event, start, end) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = rect.x + Math.max(start.x, end.x);
+      const y = rect.y + Math.min(start.y, end.y);
+      return {x: Math.round(x), y: Math.round(y)};
+    };
     const getCoordinates = event => {
       let el = event.currentTarget;
       let x = 0;
@@ -56,6 +77,8 @@
       const buttons = document.querySelectorAll('button');
       const highlight = buttons[0];
       const erase = buttons[1];
+      const snapshot = buttons[2];
+      const file = document.querySelector('input');
       const canvas = document.querySelector('canvas');
       const log = document.querySelector('p');
       let active = null;
@@ -83,14 +106,30 @@
           this[`on${e.type}`](e);
         },
         draw() {
+          if (!this.ctx) {
+            this.ctx = canvas.getContext('2d');
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeStyle = 'rgb(208,1,27)';
+            this.ctx.fillStyle = 'rgb(0,0,0)';
+          }
           this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (handler.image) {
+            const startW = handler.image.width;
+            const startH = handler.image.height;
+            const ratioW = canvas.width / startW;
+            const ratioH = canvas.height / startH;
+            const ratio = Math.min(ratioW, ratioH);
+            const endW = startW * ratio;
+            const endH = startH * ratio;
+            canvas.getContext('2d').drawImage(handler.image, 0, 0, startW, startH, 0, 0, endW, endH);
+          }
           for (const info of this.paths) {
             const method = `${info.type}Rect`;
             this.ctx[method](
               info.start.x,
               info.start.y,
-              info.end.x,
-              info.end.y
+              info.size.width,
+              info.size.height
             );
           }
         },
@@ -98,12 +137,7 @@
           if (!this.drawing) {
             stop(e);
             this.drawing = true;
-            this.ctx = canvas.getContext('2d');
-            this.ctx.lineWidth = 10;
-            this.ctx.strokeStyle = 'rgb(255,0,0)';
-            this.ctx.fillStyle = 'rgb(0,0,0)';
             this.start = getCoordinates(e);
-            log.textContent = 'down ' + JSON.stringify(this.start);
           }
         },
         onpointermove(e) {
@@ -118,7 +152,6 @@
               coords.x - this.start.x,
               coords.y - this.start.y
             );
-            log.textContent = 'move ' + JSON.stringify({x: coords.x - this.start.x, y: coords.y - this.start.y});
           }
         },
         onpointerup(e) {
@@ -129,11 +162,14 @@
             // get out of here if the mouse didn't move at all
             if (this.start.x === coords.x && this.start.y === coords.y)
               return;
-            const end = {x: coords.x - this.start.x, y: coords.y - this.start.y};
+            const closeCoords = getPageCoordinates(e, this.start, coords);
             const info = {
               type: active === highlight ? 'stroke' : 'fill',
               start: this.start,
-              end: end,
+              size: {
+                width: coords.x - this.start.x,
+                height: coords.y - this.start.y
+              },
               closer: hyperHTML.wire()`
                   <span
                     class="close"
@@ -144,19 +180,19 @@
                       this.draw();
                     }}"
                     style="${{
-                      position: 'absolute',
-                      top: e.pageY + 'px',
-                      left: e.pageX + 'px'
+                      top: closeCoords.y + 'px',
+                      left: closeCoords.x + 'px'
                     }}"
                   />`
             };
-            log.textContent = 'done ' + JSON.stringify(info.end);
             this.paths.push(info);
             document.body.appendChild(info.closer);
           }
         }
       };
-  
+
+      canvas.width = canvas.getBoundingClientRect().width;
+      canvas.height = canvas.getBoundingClientRect().height;
       if ('onpointerup' in canvas) {
         canvas.addEventListener('pointerdown', handler, {passive: false});
         canvas.addEventListener('pointermove', handler, {passive: false});
@@ -169,6 +205,29 @@
         canvas.addEventListener('mousemove', handler, {passive: false});
         canvas.addEventListener('mouseup', handler, {passive: false});
       }
+      snapshot.addEventListener('click', () => {
+        canvas.toBlob(blob => {
+          const img = document.querySelector('img') ||
+                      document.body.appendChild(document.createElement('img'));
+          const src = URL.createObjectURL(blob);
+          img.onload = () => URL.revokeObjectURL(src);
+          img.src = src;
+        });
+      });
+      file.addEventListener('change', () => {
+        const blob = file.files[0];
+        if (blob) {
+          const img = document.createElement('img');
+          const src = URL.createObjectURL(blob);
+          img.onload = () => {
+            URL.revokeObjectURL(src);
+            handler.image = img;
+            handler.draw();
+          };
+          img.src = src;
+        }
+        file.value = '';
+      });
     };
     </script>
   </head>
@@ -177,6 +236,9 @@
     <button>erase</button>
     <hr>
     <canvas></canvas>
+    <hr>
+    <input type="file">
+    <button>snapshot</button>
     <p></p>
   </body>
 </html>
