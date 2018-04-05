@@ -54,8 +54,8 @@
     <script>
     const getPageCoordinates = (event, start, end) => {
       const rect = event.currentTarget.getBoundingClientRect();
-      const x = rect.x + Math.max(start.x, end.x);
-      const y = rect.y + Math.min(start.y, end.y);
+      const x = ('x' in rect ? rect.x : rect.left) + Math.max(start.x, end.x);
+      const y = ('y' in rect ? rect.y : rect.top) + Math.min(start.y, end.y);
       return {x: Math.round(x), y: Math.round(y)};
     };
     const getCoordinates = event => {
@@ -206,13 +206,10 @@
         canvas.addEventListener('mouseup', handler, {passive: false});
       }
       snapshot.addEventListener('click', () => {
-        canvas.toBlob(blob => {
-          const img = document.querySelector('img') ||
-                      document.body.appendChild(document.createElement('img'));
-          const src = URL.createObjectURL(blob);
-          img.onload = () => URL.revokeObjectURL(src);
-          img.src = src;
-        });
+        const img = document.querySelector('img') ||
+                    document.body.appendChild(document.createElement('img'));
+        const src = canvas.toDataURL();
+        img.src = src;
       });
       file.addEventListener('change', () => {
         const blob = file.files[0];
