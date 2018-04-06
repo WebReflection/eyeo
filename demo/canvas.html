@@ -74,6 +74,7 @@
     };
 
     this.onload = function () {'use strict';
+      const rIC = window.requestIdleCallback || setTimeout;
       const buttons = document.querySelectorAll('button');
       const highlight = buttons[0];
       const erase = buttons[1];
@@ -105,7 +106,16 @@
         handleEvent(e) {
           this[`on${e.type}`](e);
         },
+        init() {
+          if (!this.ctx) {
+            this.ctx = canvas.getContext('2d');
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeStyle = 'rgb(208,1,27)';
+            this.ctx.fillStyle = 'rgb(0,0,0)';
+          }
+        },
         draw() {
+          this.init();
           this.ctx.clearRect(0, 0, canvas.width, canvas.height);
           if (this.imageData) {
             this.ctx.putImageData(this.imageData, 0, 0);
@@ -121,12 +131,7 @@
           }
         },
         createImageData(image) {
-          if (!this.ctx) {
-            this.ctx = canvas.getContext('2d');
-            this.ctx.lineWidth = 4;
-            this.ctx.strokeStyle = 'rgb(208,1,27)';
-            this.ctx.fillStyle = 'rgb(0,0,0)';
-          }
+          this.init();
           this.ctx.clearRect(0, 0, canvas.width, canvas.height);
           const startW = image.width;
           const startH = image.height;
@@ -148,7 +153,10 @@
             for (; i < data.length; i++) {
               data[i] = mapping[data[i] >> 6];
               if (i > 0 && i % 5000 == 0) {
-                return setTimeout(remap, 0, i + 1);
+                return rIC(() => {
+                  handler.draw();
+                  rIC(() => remap(i + 1));
+                });
               }
             }
             resolve();
