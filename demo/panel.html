@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+  <head>
+    <title>progressive panels</title>
+    <style>
+      io-tab {
+        display: inline-block;
+        margin: 8px;
+        border: 1px solid black;
+        padding: 8px;
+      }
+    </style>
+    <script>
+    this.onload = () => {
+
+      customElements.define('io-tab', class extends HTMLElement {
+        connectedCallback() {
+          this.innerHTML = `
+          <label>
+            <input type="checkbox"> make it ready
+          </label>`;
+          this.disabled = true;
+        }
+        get disabled() {
+          return this.querySelector('input').disabled;
+        }
+        set disabled(value) {
+          this.style.opacity = value ? .5 : 1;
+          this.querySelector('input').disabled = value;;
+        }
+        get completed() {
+          return this.querySelector('input').checked;
+        }
+      });
+
+      customElements.whenDefined('io-tab').then(() => {
+        customElements.define('io-panel', class extends HTMLElement {
+          connectedCallback() {
+            this.addEventListener('change', event => {
+              const children = [].slice.call(this.children);
+              const tab = event.target.closest('io-tab');
+              const index = children.indexOf(tab);
+              for (let i = 0; i < index; i++)
+                children[i].disabled = false;
+              for (let i = index + 1; i < children.length; i++) {
+                children[i].disabled = children[i - 1].disabled || !children[i - 1].completed;
+              }
+            });
+            this.children[0].disabled = false;
+            this.children[0].dispatchEvent(new CustomEvent('change', {bubbles: true}));
+          }
+        });
+      });
+
+    };
+    </script>
+  </head>
+  <body>
+    <io-panel>
+      <io-tab></io-tab>
+      <io-tab></io-tab>
+      <io-tab></io-tab>
+      <io-tab></io-tab>
+    </io-panel>
+  </body>
+</html>
