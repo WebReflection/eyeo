@@ -18,6 +18,7 @@
       <io-tab></io-tab>
       <io-tab></io-tab>
     </io-panel>
+    <input type="submit" disabled>
     <script>
     this.onload = () => {
 
@@ -47,15 +48,22 @@
             this.addEventListener('change', event => {
               const children = [].slice.call(this.children);
               const tab = event.target.closest('io-tab');
-              const index = children.indexOf(tab);
+              const index = children.indexOf(tab) + 1;
+              if (index < children.length && children[index].disabled) {
+                children[index].disabled = false;
+              }
+              document.querySelector('input[type="submit"]').disabled =
+                !children.every(tab => tab.completed);
+              /*
               for (let i = 0; i < index; i++)
                 children[i].disabled = false;
               for (let i = index + 1; i < children.length; i++) {
                 children[i].disabled = children[i - 1].disabled || !children[i - 1].completed;
               }
+              */
             });
             this.children[0].disabled = false;
-            this.children[0].dispatchEvent(new CustomEvent('change', {bubbles: true}));
+            // this.children[0].dispatchEvent(new CustomEvent('change', {bubbles: true}));
           }
         });
       });
