@@ -29,8 +29,13 @@ io-highlighter .split {
 
 io-highlighter .options {
   padding: 12px;
+  color: #4A4A4A;
   background-color: #f1f1f1;
   border-right: 1px solid #979797; }
+
+io-highlighter .options .active {
+  color: #FFF;
+  background-color: #9b9b9b; }
 
 io-highlighter canvas {
   flex-grow: 1;
@@ -68,9 +73,6 @@ io-highlighter .options .hide {
   outline: none;
   background-position: center 12px;
   background-repeat: no-repeat; }
-
-io-highlighter .options .active {
-  background-color: #9b9b9b; }
 
 io-highlighter .closer {
   position: absolute;
