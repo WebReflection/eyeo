@@ -122,10 +122,14 @@ class IOSteps extends IOElement
     }
   }
 
+  // dispatch a "step:click" event providing
+  // the clicked index as event.detail property
   onclick(event)
   {
     event.preventDefault();
-    this.dispatchEvent(new CustomEvent("change", {
+    event.stopPropagation();
+    this.dispatchEvent(new CustomEvent("step:click", {
+      bubbles: true,
       detail: indexOf.call(this.children, event.currentTarget)
     }));
   }
@@ -3463,7 +3467,7 @@ document.addEventListener(
   () =>
   {
     document.querySelector("io-steps").addEventListener(
-      "change",
+      "step:click",
       event =>
       {
         document.querySelectorAll("input")[event.detail].focus();
