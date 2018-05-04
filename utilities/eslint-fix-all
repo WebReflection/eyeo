@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+
+// compatible with node 4 and higher
+
+// INSTALL
+// npm install -g eslint
+// copy this file as eslint-fix-all into /user/local/bin
+// sudo chmod a+x /user/local/bin/eslint-fix-all
+// hook the command eslint-fix-all $1 to your editor
+// where $1 is the file name the editor should pass along
+// every time you save, if the linter passed,
+// your code will also be formatted to respect style guide
+
+// list of fixes, *order matters*
+var fixes = {
+  js: [
+    /*
+      if (exp)
+    {
+
+      becomes
+
+      if (exp)
+      {
+    */
+    function (code) {
+      return code.replace(/^{/mg, function ($0, $1) {
+        var newLine = code.lastIndexOf('\n', $1 - 2);
+        var spaces = code.slice(newLine + 1, $1 - 1).match(/^(\s*)/)[1];
+        return spaces + '{';
+      });
+    },
+
+    /*
+      if (exp) return;
+
+      becomes
+
+      if (exp)
+        return;
+    */
+    function (code) {
+      return code.replace(
+        /^(\s*)(else(?! if)|(?:else\s+)?if\s+\([^\n]+?\))[ ]+([a-zA-Z_$])/mg,
+        '$1$2\n$1  $3'
+      );
+    }
+
+  ],
+  css: [
+    /*
+      .3
+
+      becomes
+
+      0.3
+    */
+    function (code) {
+      return code.replace(/ (\.\d+)/g, '0$1');
+    },
+
+    /*
+      #selector {
+
+      becomes
+
+      #selector
+      {
+    */
+    function (code) {
+      return code.replace(/\s+\{$/mg, '\n{');
+    },
+
+    /*
+      #selector
+    {
+      }
+
+      becomes
+
+      #selector
+      {
+      }
+    */
+    function (code) {
+      return code.replace(
+        /^{$/mg,
+        function ($0, $1) {
+          var newLine = code.lastIndexOf('\n', $1 - 2);
+          var spaces = code.slice(newLine + 1, $1 - 1).match(/^(\s*)/)[1];
+          return spaces + '{';
+        }
+      );
+    },
+
+    /*
+      #selector
+      {}
+      .class
+      {}
+
+      becomes
+
+      #selector
+      {}
+
+      .class
+      {}
+    */
+    function (code) {
+      return code.replace(/}\n(\S)/g, '}\n\n$1');
+    },
+
+    function (code) {
+      return code.replace(/}\n+}/g, '}\n}');
+    }
+  ]
+};
+
+var file = process.argv[2];
+var fs = require('fs');
+
+if (/\.js$/.test(file)) {
+  require('child_process')
+    .spawn('eslint', ['--fix', file])
+    .on('close', function (code) {
+      if (code === 0) {
+        fs.writeFileSync(
+          file,
+          fixes.js.reduce(
+            fix,
+            fs.readFileSync(file).toString()
+          )
+        );
+      }
+      process.exit(code);
+    });
+} else if (/\.s?css$/.test(file)) {
+  try {
+    fs.writeFileSync(
+      file,
+      fixes.css.reduce(
+        fix,
+        fs.readFileSync(file).toString()
+      )
+    );
+    process.exit(0);
+  } catch(o_O) {
+    process.exit(1);
+  }
+}
+
+function fix(content, fn) {
+  return fn(content);
+}
