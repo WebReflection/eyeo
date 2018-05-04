@@ -333,7 +333,22 @@ IOElement.intent("i18n", id =>
 module.exports = IOElement;
 
 },{"document-register-element/pony":4,"hyperhtml-element/cjs":5}],3:[function(require,module,exports){
-/* globals module, require */
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 "use strict";
 
@@ -398,13 +413,19 @@ class IOHighlighter extends IOElement
     <div class="split">
       <div class="options">
         <button
+          tabindex="-1"
           class="${"highlight" + highClass}"
           onclick="${() => changeMode(this, "highlight")}"
-        >Highlight</button>
+        >
+          ${{i18n: "issueReporter_screenshot_highlight"}}
+        </button>
         <button
+          tabindex="-1"
           class="${"hide" + hideClass}"
           onclick="${() => changeMode(this, "hide")}"
-        >Hide</button>
+        >
+          ${{i18n: "issueReporter_screenshot_hide"}}
+        </button>
       </div>
       <canvas class="${this.state.drawing ? "active" : ""}" />
     </div>`;
@@ -2122,7 +2143,6 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = HyperHTMLE
 
 },{"hyperhtml/cjs":10}],6:[function(require,module,exports){
 'use strict';
-const { UID } = require('../shared/constants.js');
 const { WeakMap } = require('../shared/poorlyfills.js');
 
 // hyperHTML.Component is a very basic class
@@ -2133,31 +2153,31 @@ const { WeakMap } = require('../shared/poorlyfills.js');
 // The main difference is that declared components
 // will not automatically render on setState(...)
 // to simplify state handling on render.
-function Component() {}
+function Component() {
+  return this; // this is needed in Edge !!!
+}
 Object.defineProperty(exports, '__esModule', {value: true}).default = Component
 
-// components will lazily define html or svg properties
-// as soon as these are invoked within the .render() method
-// Such render() method is not provided by the base class
-// but it must be available through the Component extend.
-// Declared components could implement a
-// render(props) method too and use props as needed.
+// Component is lazily setup because it needs
+// wire mechanism as lazy content
 function setup(content) {
+  // there are various weakly referenced variables in here
+  // and mostly are to use Component.for(...) static method.
   const children = new WeakMap;
   const create = Object.create;
   const createEntry = (wm, id, component) => {
     wm.set(id, component);
     return component;
   };
-  const get = (Class, info, id) => {
+  const get = (Class, info, context, id) => {
     switch (typeof id) {
       case 'object':
       case 'function':
         const wm = info.w || (info.w = new WeakMap);
-        return wm.get(id) || createEntry(wm, id, new Class);
+        return wm.get(id) || createEntry(wm, id, new Class(context));
       default:
         const sm = info.p || (info.p = create(null));
-        return sm[id] || (sm[id] = new Class);
+        return sm[id] || (sm[id] = new Class(context));
     }
   };
   const set = context => {
@@ -2165,14 +2185,19 @@ function setup(content) {
     children.set(context, info);
     return info;
   };
+  // The Component Class
   Object.defineProperties(
     Component,
     {
+      // Component.for(context[, id]) is a convenient way
+      // to automatically relate data/context to children components
+      // If not created yet, the new Component(context) is weakly stored
+      // and after that same instance would always be returned.
       for: {
         configurable: true,
         value(context, id) {
           const info = children.get(context) || set(context);
-          return get(this, info, id == null ? 'default' : id);
+          return get(this, info, context, id == null ? 'default' : id);
         }
       }
     }
@@ -2180,6 +2205,7 @@ function setup(content) {
   Object.defineProperties(
     Component.prototype,
     {
+      // all events are handled with the component as context
       handleEvent: {value(e) {
         const ct = e.currentTarget;
         this[
@@ -2187,10 +2213,21 @@ function setup(content) {
           ('on' + e.type)
         ](e);
       }},
+      // components will lazily define html or svg properties
+      // as soon as these are invoked within the .render() method
+      // Such render() method is not provided by the base class
+      // but it must be available through the Component extend.
+      // Declared components could implement a
+      // render(props) method too and use props as needed.
       html: lazyGetter('html', content),
       svg: lazyGetter('svg', content),
+      // the state is a very basic/simple mechanism inspired by Preact
       state: lazyGetter('state', function () { return this.defaultState; }),
+      // it is possible to define a default state that'd be always an object otherwise
       defaultState: {get() { return {}; }},
+      // setting some property state through a new object
+      // or a callback, triggers also automatically a render
+      // unless explicitly specified to not do so (render === false)
       setState: {value(state, render) {
         const target = this.state;
         const source = typeof state === 'function' ? state.call(this, target) : state;
@@ -2219,7 +2256,7 @@ const lazyGetter = (type, fn) => {
   };
 };
 
-},{"../shared/constants.js":15,"../shared/poorlyfills.js":19}],7:[function(require,module,exports){
+},{"../shared/poorlyfills.js":19}],7:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -2678,7 +2715,9 @@ const Path = (m => m.__esModule ? m.default : m)(require('./Path.js'));
 const Style = (m => m.__esModule ? m.default : m)(require('./Style.js'));
 const Intent = (m => m.__esModule ? m.default : m)(require('./Intent.js'));
 const domdiff = (m => m.__esModule ? m.default : m)(require('../shared/domdiff.js'));
-const { create: createElement, text } = require('../shared/easy-dom.js');
+// see /^script$/i.test(nodeName) bit down here
+// import { create as createElement, text } from '../shared/easy-dom.js';
+const { text } = require('../shared/easy-dom.js');
 const { Event, WeakSet, isArray, trim } = require('../shared/poorlyfills.js');
 const { createFragment, slice } = require('../shared/utils.js');
 
@@ -2738,6 +2777,7 @@ const create = (root, paths) => {
         break;
       case 'text':
         updates.push(setTextContent(node));
+        node.textContent = '';
         break;
     }
   }
@@ -2829,7 +2869,13 @@ const findAttributes = (node, paths, parts) => {
   }
   const len = remove.length;
   for (let i = 0; i < len; i++) {
-    node.removeAttributeNode(remove[i]);
+    // Edge HTML bug #16878726
+    const attribute = remove[i];
+    if (/^id$/i.test(attribute.name))
+      node.removeAttribute(attribute.name);
+    // standard browsers would work just fine here
+    else
+      node.removeAttributeNode(remove[i]);
   }
 
   // This is a very specific Firefox/Safari issue
@@ -2837,10 +2883,15 @@ const findAttributes = (node, paths, parts) => {
   // it's probably worth patching regardless.
   // Basically, scripts created through strings are death.
   // You need to create fresh new scripts instead.
-  // TODO: is there any other node that needs such nonsense ?
+  // TODO: is there any other node that needs such nonsense?
   const nodeName = node.nodeName;
   if (/^script$/i.test(nodeName)) {
-    const script = createElement(node, nodeName);
+    // this used to be like that
+    // const script = createElement(node, nodeName);
+    // then Edge arrived and decided that scripts created
+    // through template documents aren't worth executing
+    // so it became this ... hopefully it won't hurt in the wild
+    const script = document.createElement(nodeName);
     for (let i = 0; i < attributes.length; i++) {
       script.setAttributeNode(attributes[i].cloneNode(true));
     }
@@ -3084,8 +3135,7 @@ const setAttribute = (node, name, original) => {
 // different from text there but it's worth checking
 // for possible defined intents.
 const setTextContent = node => {
-  // avoid hyper comments inside textarea/style when value is undefined
-  let oldValue = '';
+  let oldValue;
   const textContent = value => {
     if (oldValue !== value) {
       oldValue = value;
@@ -3233,6 +3283,13 @@ exports.UIDC = UIDC;
 
 const identity = O => O;
 
+const remove = (parentNode, before, after) => {
+  const range = parentNode.ownerDocument.createRange();
+  range.setStartBefore(before);
+  range.setEndAfter(after);
+  range.deleteContents();
+};
+
 const domdiff = (
   parentNode,     // where changes happen
   currentNodes,   // Array of current items/nodes
@@ -3296,13 +3353,36 @@ const domdiff = (
         futureStartNode = futureNodes[++futureStart];
       }
       else {
-        let el = currentNodes[index];
-        currentNodes[index] = null;
-        parentNode.insertBefore(
-          get(el, 1),
-          get(currentStartNode, 0)
-        );
-        futureStartNode = futureNodes[++futureStart];
+        let i = index;
+        let f = futureStart;
+        while (
+          i <= currentEnd &&
+          f <= futureEnd &&
+          currentNodes[i] === futureNodes[f]
+        ) {
+          i++;
+          f++;
+        }
+        if (1 < (i - index)) {
+          if (--index === currentStart) {
+            parentNode.removeChild(get(currentStartNode, -1));
+          } else {
+            remove(
+              parentNode,
+              get(currentStartNode, -1),
+              get(currentNodes[index], -1)
+            );
+          }
+          currentStart = i;
+          futureStart = f;
+          currentStartNode = currentNodes[i];
+          futureStartNode = futureNodes[f];
+        } else {
+          const el = currentNodes[index];
+          currentNodes[index] = null;
+          parentNode.insertBefore(get(el, 1), get(currentStartNode, 0));
+          futureStartNode = futureNodes[++futureStart];
+        }
       }
     }
   }
@@ -3327,10 +3407,11 @@ const domdiff = (
         parentNode.removeChild(get(currentNodes[currentStart], -1));
       }
       else {
-        const range = parentNode.ownerDocument.createRange();
-        range.setStartBefore(get(currentNodes[currentStart], -1));
-        range.setEndAfter(get(currentNodes[currentEnd], -1));
-        range.deleteContents();
+        remove(
+          parentNode,
+          get(currentNodes[currentStart], -1),
+          get(currentNodes[currentEnd], -1)
+        );
       }
     }
   }

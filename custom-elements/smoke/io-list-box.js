@@ -1,20 +1,5 @@
 /* eslint-disable */(function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
-/*
- * This file is part of Adblock Plus <https://adblockplus.org/>,
- * Copyright (C) 2006-present eyeo GmbH
- *
- * Adblock Plus is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
- *
- * Adblock Plus is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
- */
+/* globals module, require */
 
 "use strict";
 
@@ -26,65 +11,12 @@ if (typeof customElements !== "object")
 // external dependencies
 const {default: HyperHTMLElement} = require("hyperhtml-element/cjs");
 
-// common DOM utilities exposed as IOElement.utils
-const DOMUtils = {
-
-  // boolean related operations/helpers
-  boolean: {
-    // utils.boolean.attribute(node, name, setAsTrue):void
-    // set a generic node attribute name as "true"
-    // if value is a boolean one or it removes the attribute
-    attribute(node, name, setAsTrue)
-    {
-      // don't use `this.value(value)` with `this` as context
-      // to make destructuring of helpers always work.
-      // @example
-      // const {attribute: setBoolAttr} = IOElement.utils.boolean;
-      // setBoolAttr(node, 'test', true);
-      if (DOMUtils.boolean.value(setAsTrue))
-      {
-        node.setAttribute(name, "true");
-      }
-      else
-      {
-        node.removeAttribute(name);
-      }
-    },
-
-    // utils.boolean.value(any):boolean
-    // it returns either true or false
-    // via truthy or falsy values, but also via strings
-    // representing "true", "false" as well as "0" or "1"
-    value(value)
-    {
-      if (typeof value === "string" && value.length)
-      {
-        try
-        {
-          value = JSON.parse(value);
-        }
-        catch (error)
-        {
-          // Ignore invalid JSON to continue using value as string
-        }
-      }
-      return !!value;
-    }
-  }
-};
-
 // provides a unique-id suffix per each component
 let counter = 0;
 
 // common Custom Element class to extend
 class IOElement extends HyperHTMLElement
 {
-  // exposes DOM helpers as read only utils
-  static get utils()
-  {
-    return DOMUtils;
-  }
-
   // get a unique ID or, if null, set one and returns it
   static getID(element)
   {
@@ -110,23 +42,6 @@ class IOElement extends HyperHTMLElement
 
   // by default, render is a no-op
   render() {}
-
-  // usually a template would contain a main element such
-  // input, button, div, section, etc.
-  // having a simple way to retrieve such element can be
-  // both semantic and handy, as opposite of using
-  // this.children[0] each time
-  get child()
-  {
-    let element = this.firstElementChild;
-    // if accessed too early, will render automatically
-    if (!element)
-    {
-      this.render();
-      element = this.firstElementChild;
-    }
-    return element;
-  }
 }
 
 // whenever an interpolation with ${{i18n: 'string-id'}} is found
@@ -166,33 +81,63 @@ module.exports = IOElement;
 "use strict";
 
 const IOElement = require("./io-element");
-const {boolean} = IOElement.utils;
 
-class IOToggle extends IOElement
+// used to create options
+const {wire} = IOElement;
+
+// used to map codes cross browser
+const KeyCode = {
+  BACKSPACE: 8,
+  TAB: 9,
+  RETURN: 13,
+  ESC: 27,
+  SPACE: 32,
+  PAGE_UP: 33,
+  PAGE_DOWN: 34,
+  END: 35,
+  HOME: 36,
+  LEFT: 37,
+  UP: 38,
+  RIGHT: 39,
+  DOWN: 40,
+  DELETE: 46
+};
+
+class IOListBox extends IOElement
 {
-  // action, checked, and disabled should be reflected down the button
   static get observedAttributes()
   {
-    return ["action", "checked", "disabled"];
+    return ["action", "disabled", "expanded", "items", "placeholder"];
   }
 
   created()
   {
-    this.addEventListener("click", this);
-    this.render();
+    this._blurTimer = 0;
+    this._bootstrap = true;
+    this._selected = {};
+    this._text = this.textContent.trim();
+    // in case the component has been addressed and
+    // it has already an attached items property
+    if (this.hasOwnProperty("items"))
+    {
+      const items = this.items;
+      delete this.items;
+      this.items = items;
+    }
   }
 
-  get checked()
+  // shortcuts to retrieve sub elements
+  get label()
   {
-    return this.hasAttribute("checked");
+    return this.querySelector(`#${this.id}label`);
   }
 
-  set checked(value)
+  get popup()
   {
-    boolean.attribute(this, "checked", value);
-    this.render();
+    return this.querySelector(`#${this.id}popup`);
   }
 
+  // component status
   get disabled()
   {
     return this.hasAttribute("disabled");
@@ -200,41 +145,257 @@ class IOToggle extends IOElement
 
   set disabled(value)
   {
-    boolean.attribute(this, "disabled", value);
+    booleanAttribute.call(this, "disabled", value);
     this.render();
   }
 
-  onclick(event)
+  get expanded()
+  {
+    return this.hasAttribute("expanded");
+  }
+
+  set expanded(value)
+  {
+    booleanAttribute.call(this, "expanded", value);
+    this.render();
+  }
+
+  // items handler
+  get items()
+  {
+    return this._items;
+  }
+
+  set items(items)
+  {
+    this._items = items;
+    this.render();
+    // if no itmes were passed, clean up
+    // and bootstrap the next time
+    if (!items.length)
+    {
+      this._bootstrap = true;
+    }
+    // if it needs to bootstrap (cleanup or new component)
+    else if (this._bootstrap)
+    {
+      this._bootstrap = false;
+      for (const item of items)
+      {
+        // if an item is selected
+        if (this._selected[getID(item)])
+        {
+          // simulate hover it and exit
+          hover.call(this, item);
+          return;
+        }
+      }
+      // if no item was selected, hover the first one
+      hover.call(this, items[0]);
+    }
+  }
+
+  // events related methods
+  handleEvent(event)
   {
     if (!this.disabled)
     {
-      this.checked = !this.checked;
-      if (this.ownerDocument.activeElement !== this.child)
-      {
-        this.child.focus();
-      }
+      this[`on${event.type}`](event);
+    }
+  }
+
+  // label related events
+  onblur(event)
+  {
+    this._blurTimer = setTimeout(() => this.expanded = false, 400);
+  }
+
+  onfocus(event)
+  {
+    // if 0 or already cleared, nothing happens, really
+    clearTimeout(this._blurTimer);
+    // show the popup
+    this.expanded = true;
+  }
+
+  onkeydown(event)
+  {
+    event.preventDefault();
+    const hovered = this.querySelector(".hover");
+    const key = event.which || event.keyCode;
+    switch (key)
+    {
+      case KeyCode.BACKSPACE:
+      case KeyCode.DELETE:
+        break;
+      /* both SPACE, RETURN and ESC hide and blur */
+      case KeyCode.RETURN:
+      case KeyCode.SPACE:
+        hovered.dispatchEvent(new CustomEvent("click", {bubbles: true}));
+        /* eslint: fall through */
+      case KeyCode.ESC:
+        this.expanded = false;
+        break;
+      case KeyCode.UP:
+        const prev = findNext.call(
+          this,
+          hovered, "previousElementSibling", "lastElementChild"
+        );
+        if (prev)
+          hover.call(this, getItem.call(this, prev.id));
+        break;
+      case KeyCode.DOWN:
+        const next = findNext.call(
+          this,
+          hovered, "nextElementSibling", "firstElementChild"
+        );
+        if (next)
+          hover.call(this, getItem.call(this, next.id));
+        break;
+    }
+  }
+
+  // popup related events
+  onclick(event)
+  {
+    event.preventDefault();
+    clearTimeout(this._blurTimer);
+    const query = '[role="option"]:not([aria-disabled="true"])';
+    const el = event.target.closest(query);
+    this.expanded = false;
+    this.label.blur();
+    if (el)
+    {
+      this._selected[el.id] = !this._selected[el.id];
+      this.render();
       this.dispatchEvent(new CustomEvent("change", {
-        bubbles: true,
-        cancelable: true,
-        detail: this.checked
+        detail: getItem.call(this, el.id)
       }));
     }
   }
 
+  onmouseover(event)
+  {
+    const el = event.target.closest('[role="option"]');
+    if (el && !el.classList.contains("hover"))
+      hover.call(this, this._items.find(item => getID(item) === el.id));
+  }
+
+  // the view
   render()
   {
     this.html`
     <button
-      role="checkbox"
+      role="combobox"
+      aria-readonly="true"
+      id="${this.id + "label"}"
       disabled="${this.disabled}"
       data-action="${this.action}"
-      aria-checked="${this.checked}"
+      aria-owns="${this.id + "popup"}"
       aria-disabled="${this.disabled}"
-    />`;
+      aria-expanded="${this.expanded}"
+      aria-haspopup="${this.id + "popup"}"
+      onblur="${this}" onfocus="${this}" onkeydown="${this}"
+    >${this.expanded ? this.placeholder : this._text}</button>
+    <ul
+      role="listbox"
+      tab-index="-1"
+      id="${this.id + "popup"}"
+      aria-labelledby="${this.id + "label"}"
+      hidden="${!this.expanded}"
+      onclick="${this}" onmouseover="${this}"
+    >${this._items.map(item =>
+    {
+      const id = getID(item);
+      if (!this._selected.hasOwnProperty(id))
+      {
+        this._selected[id] = false;
+      }
+      return wire(this, `html:${id}`)`
+      <li
+        id="${id}"
+        role="option"
+        aria-disabled="${!item.disabled}"
+        aria-selected="${this._selected[id]}"
+      >${item.value}</li>`;
+    })}</ul>`;
   }
 }
 
-IOToggle.define("io-toggle");
+IOListBox.define("io-list-box");
+
+function asBoolean(value)
+{
+  return typeof value === "string" ? JSON.parse(value) : !!value;
+}
+
+function booleanAttribute(name, value)
+{
+  if (asBoolean(value))
+  {
+    this.setAttribute(name, "true");
+  }
+  else
+  {
+    this.removeAttribute(name);
+  }
+}
+
+// To retrieve an item from a DOM id
+// this._items.find(byID, id);
+function byID(item)
+{
+  return getID(item) == this;
+}
+
+// to retrieve a unique ID per item
+function getID(item)
+{
+  return `li-${item.url.replace(/\W/g, "-")}`;
+}
+
+// to retrieve an item from an option id
+function getItem(id)
+{
+  return this._items.find(item => getID(item) === id);
+}
+
+// private helper
+function hover(item)
+{
+  const id = getID(item);
+  const hovered = this.querySelector(".hover");
+  if (hovered)
+    hovered.classList.remove("hover");
+  const option = this.querySelector(`#${id}`);
+  option.classList.add("hover");
+  this.label.setAttribute("aria-activedescendant", id);
+  const popup = this.popup;
+  if (popup.scrollHeight > popup.clientHeight)
+  {
+    const scrollBottom = popup.clientHeight + popup.scrollTop;
+    const elementBottom = option.offsetTop + option.offsetHeight;
+    if (elementBottom > scrollBottom)
+    {
+      popup.scrollTop = elementBottom - popup.clientHeight;
+    }
+    else if (option.offsetTop < popup.scrollTop)
+    {
+      popup.scrollTop = option.offsetTop;
+    }
+  }
+}
+
+// find next available hoverable node
+function findNext(el, other, fallback)
+{
+  const first = el;
+  do
+  {
+    el = el[other] || el.parentNode[fallback];
+  } while (el !== first && !getItem.call(this, el.id).disabled);
+  return el === first ? null : el;
+}
 
 },{"./io-element":1}],3:[function(require,module,exports){
 /*!
@@ -3514,8 +3675,10 @@ const SVGFragment = hasContent ?
   };
 
 },{"./constants.js":14,"./easy-dom.js":16,"./features-detection.js":17,"./re.js":19}],21:[function(require,module,exports){
+/* globals require */
+
 "use strict";
 
-require("../js/io-toggle");
+require("../js/io-list-box");
 
-},{"../js/io-toggle":2}]},{},[21]);
+},{"../js/io-list-box":2}]},{},[21]);

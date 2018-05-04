@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "eyeo",
+  "scripts": {
+    "smoke": "cp -R ~/gitlab/adblockplusui/smoke ./custom-elements"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebReflection/eyeo.git"
+  },
+  "author": "Andrea Giammarchi",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/WebReflection/eyeo/issues"
+  },
+  "homepage": "https://github.com/WebReflection/eyeo#readme"
+}
