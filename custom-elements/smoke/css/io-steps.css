@@ -40,7 +40,7 @@ io-steps button {
   color: #077ca7;
   background: #f3f3f3; }
 
-io-steps button:before {
+io-steps button::before {
   display: block;
   width: 24px;
   height: 24px;
@@ -53,13 +53,13 @@ io-steps button:before {
   background-color: #077ca7;
   border-radius: 12px; }
 
-io-steps button:disabled:before {
+io-steps button:disabled::before {
   background-color: #9b9b9b; }
 
 io-steps button:disabled {
   color: #d8d8d8; }
 
-io-steps button.completed:before {
+io-steps button.completed::before {
   content: '✔';
   animation: io-steps-completed 0.3s ease-in-out; }
 

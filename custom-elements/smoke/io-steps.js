@@ -189,7 +189,7 @@ class IOSteps extends IOElement
     // reset setup
     this.created();
     // attributes can have new lines and/or commas too
-    for (const label of this.i18nLabels.split(/[,\n]+/))
+    for (const label of this.i18nLabels.split(/[\n ]+/))
     {
       const trimmed = label.trim();
       if (trimmed.length)
@@ -208,11 +208,11 @@ class IOSteps extends IOElement
 
   // set an index completed state
   // by default, completed is true
-  setCompleted(index, completed /* = true */)
+  setCompleted(index, completed = true)
   {
-    this.children[index].classList.toggle("completed", completed !== false);
+    this.children[index].classList.toggle("completed", completed);
     if (
-      completed !== false &&
+      completed &&
       index < this.labels.length &&
       this._enabled <= index
     )
@@ -230,7 +230,7 @@ class IOSteps extends IOElement
     event.stopPropagation();
     this.dispatchEvent(new CustomEvent("step:click", {
       bubbles: true,
-      detail: indexOf.call(this.children, event.currentTarget)
+      detail: Array.prototype.call(this.children, event.currentTarget)
     }));
   }
 
@@ -241,8 +241,6 @@ class IOSteps extends IOElement
 }
 
 const {wire} = IOElement;
-const {indexOf} = Array.prototype;
-
 function getButton(label, index)
 {
   // each click dispatches change event
@@ -3548,14 +3546,9 @@ document.addEventListener(
     const input = event.target;
     const inputs = input.parentNode.querySelectorAll("input");
     const index = Array.prototype.indexOf.call(inputs, input);
-    document.querySelector("io-steps").setCompleted(
-      index,
-      input.matches(":valid")
-    );
-    if (
-      input.matches(":valid") &&
-      index < inputs.length
-    )
+    const isValid = input.checkValidity();
+    document.querySelector("io-steps").setCompleted(index, isValid);
+    if (isValid && index < inputs.length)
     {
       inputs[index + 1].disabled = false;
     }
