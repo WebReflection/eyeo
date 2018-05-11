@@ -168,7 +168,7 @@ module.exports = IOElement;
 const IOElement = require("./io-element");
 
 // a three steps example:
-// <io-steps i18n-labels="first,second,third" />
+// <io-steps i18n-labels="first second third" />
 class IOSteps extends IOElement
 {
   static get observedAttributes()
@@ -188,7 +188,7 @@ class IOSteps extends IOElement
   {
     // reset setup
     this.created();
-    // attributes can have new lines and/or commas too
+    // attributes can have spaces or new lines too
     for (const label of this.i18nLabels.split(/[\n ]+/))
     {
       const trimmed = label.trim();
