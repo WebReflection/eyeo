@@ -49,6 +49,28 @@ var fixes = {
   ],
   css: [
     /*
+      [attr=value]
+
+      becomes
+
+      [attr="value"]
+    */
+    function (code) {
+      return code.replace(/\[([a-z-]+)=([a-z-]+)\]/g, '[$1="$2"]');
+    },
+
+    /*
+      tmp:before
+
+      becomes
+
+      tmp::before
+    */
+    function (code) {
+      return code.replace(/([^:]):(before|after)/g, '$1::$2');
+    },
+
+    /*
       .3
 
       becomes
