@@ -69,7 +69,7 @@ updateHG() {
 mergeHG() {
   local COMMIT="$(git log -1 --pretty=%B)"
   local BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-  REV="$(cut ~/issues/$BRANCH/revision)"
+  REV="$(cat ~/issues/$BRANCH/revision)"
   git format-patch master --stdout > ~/issues/$BRANCH/git.patch
   cd ~/mercurial/adblockplusui
   cleanHG
