@@ -1,3 +1,10 @@
+:root
+{
+  --border-width-thick-doubled: calc(2 * var(--border-width-thick));
+  --border-width-thin-negative: calc(-1 * var(--border-width-thin));
+  --margin-primary-half: calc(var(--margin-primary) / 2);
+}
+
 *, *::before, *::after
 {
   box-sizing: border-box;
@@ -8,31 +15,35 @@ html, body, h1, h2
   margin: 0;
 }
 
+html, body
+{
+  background-color: var(--background-color-primary);
+}
+
 body
 {
   width: 340px;
-  border-color: var(--border-color-alternative);
-  border-radius: var(--border-radius-default);
-  border-style: var(--border-style-default);
-  border-width: var(--border-width-default);
-  background-color: var(--background-color-default);
-  color: var(--color-default);
-  font-size: var(--font-size-default);
+  border-color: var(--border-color-secondary);
+  border-radius: var(--border-radius-primary);
+  border-style: var(--border-style-primary);
+  border-width: var(--border-width-thin);
+  color: var(--color-primary);
+  font-size: var(--font-size-primary);
 }
 
 header, main > *, footer
 {
-  padding: var(--padding-default);
+  padding: var(--padding-primary);
 }
 
 header
 {
-  padding-bottom: var(--padding-default);
+  padding-bottom: var(--padding-primary);
 }
 
 header h1
 {
-  color: var(--color-alternative);
+  color: var(--color-secondary);
   font-size: var(--font-size-big);
 }
 
@@ -41,15 +52,15 @@ header .notification::before
 {
   content: ' ';
   display: block;
-  height: calc(2 * var(--border-width-alternative));
   overflow: hidden;
-  margin-left: calc(-1 * var(--border-width-default));
-  margin-right: calc(-1 * var(--border-width-default));
+  height: var(--border-width-thick-doubled);
+  margin-left: var(--border-width-thin-negative);
+  margin-right: var(--border-width-thin-negative);
   border: 0;
-  border-radius: var(--border-radius-default);
+  border-radius: var(--border-radius-primary);
   border-top-color: var(--border-top-color);
-  border-top-style: var(--border-style-default);
-  border-top-width: var(--border-width-alternative);
+  border-top-style: var(--border-style-primary);
+  border-top-width: var(--border-width-thick);
 }
 
 header .notification.critical::before
@@ -65,43 +76,43 @@ header .notification.info::before
 header .notification,
 main .card
 {
-  border-color: var(--border-color-default);
-  border-radius: var(--border-radius-default);
-  border-style: var(--border-style-default);
-  border-width: var(--border-width-default);
-  box-shadow: var(--box-shadow-default);
+  border-color: var(--border-color-primary);
+  border-radius: var(--border-radius-primary);
+  border-style: var(--border-style-primary);
+  border-width: var(--border-width-thin);
+  box-shadow: var(--box-shadow-primary);
 }
 
 header .notification
 {
   border-top: 0;
-  margin-top: var(--margin-default);
-  margin-bottom: var(--half-gap);
+  margin-top: var(--margin-primary);
+  margin-bottom: var(--margin-primary-half);
 }
 
 header .notification > div
 {
-  padding: var(--padding-default);
+  padding: var(--padding-primary);
 }
 
 header .notification h3
 {
-  color: var(--color-alternative);
-  font-size: var(--font-size-default);
+  color: var(--color-secondary);
+  font-size: var(--font-size-primary);
 }
 
 header .notification hr
 {
   border: 0;
-  height: var(--border-width-default);
-  background: var(--border-color-default);
+  height: var(--border-width-thin);
+  background: var(--border-color-primary);
 }
 
 header .notification hr + a
 {
   display: block;
-  padding-top: var(--padding-default);
-  margin-bottom: var(--half-gap);
+  padding-top: var(--padding-primary);
+  margin-bottom: var(--margin-primary-half);
 }
 
 a, a:hover, a:visited, a:active
@@ -112,57 +123,65 @@ a, a:hover, a:visited, a:active
 
 main h2
 {
-  color: var(--color-alternative);
+  color: var(--color-secondary);
   font-size: var(--font-size-medium);
 }
 
 main .details
 {
-  background-color: var(--background-color-alternative);
+  background-color: var(--background-color-secondary);
 }
 
 main .card
 {
-  padding: var(--padding-default);
-  margin-top: var(--half-gap);
-  background-color: var(--background-color-default);
+  padding: var(--padding-primary);
+  margin-top: var(--margin-primary-half);
+  background-color: var(--background-color-primary);
 }
 
 main .card strong
 {
-  color: var(--color-alternative);
+  color: var(--color-secondary);
 }
 
 main .options
 {
   display: flex;
-  padding-top: var(--padding-default);
+  padding-top: var(--padding-primary);
 }
 
 main .options button
 {
   flex-grow: 1;
   text-align: center;
-  padding: var(--padding-default);
+  padding: var(--padding-primary);
   border: 0;
+  cursor: pointer;
   font-size: var(--font-size-small);
-  color: var(--color-default);
+  color: var(--color-primary);
   background-color: transparent;
-  border-left-color: var(--border-color-default);
-  border-left-style: var(--border-style-default);
-  border-left-width: var(--border-width-default);
+  border-left-color: var(--border-color-primary);
+  border-left-style: var(--border-style-primary);
+  border-left-width: var(--border-width-thin);
+  transition: color 0.3s ease-in;
+}
+
+main .options button:hover,
+main .options button:focus
+{
+  color: var(--color-info);
 }
 
 main .options button:last-child
 {
-  border-right-color: var(--border-color-default);
-  border-right-style: var(--border-style-default);
-  border-right-width: var(--border-width-default);
+  border-right-color: var(--border-color-primary);
+  border-right-style: var(--border-style-primary);
+  border-right-width: var(--border-width-thin);
 }
 
 main > *, footer
 {
-  border-top-color: var(--border-color-default);
-  border-top-style: var(--border-style-default);
-  border-top-width: var(--border-width-default);
+  border-top-color: var(--border-color-primary);
+  border-top-style: var(--border-style-primary);
+  border-top-width: var(--border-width-thin);
 }
