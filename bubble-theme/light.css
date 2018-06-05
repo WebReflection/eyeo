@@ -17,6 +17,7 @@
   --font-size-big: 13pt;
   --font-size-medium: 12pt;
   --font-size-default: 11pt;
+  --font-size-small: 10pt;
   --margin-default: 16px;
   --padding-default: 16px;
   --half-gap: calc(var(--margin-default) / 2);

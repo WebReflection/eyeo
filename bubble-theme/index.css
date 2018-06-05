@@ -145,7 +145,7 @@ main .options button
   text-align: center;
   padding: var(--padding-default);
   border: 0;
-  font-size: var(--font-size-default);
+  font-size: var(--font-size-small);
   color: var(--color-default);
   background-color: transparent;
   border-left-color: var(--border-color-default);
