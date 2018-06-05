@@ -1,13 +1,13 @@
 [data-component="bubble-ui"],
 [data-component="bubble-ui"] *,
-[data-component="bubble-ui"] *:before,
-[data-component="bubble-ui"] *:after
+[data-component="bubble-ui"] *::before,
+[data-component="bubble-ui"] *::after
 {
   font-family: sans-serif;
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-  -webkit-font-smoothing: antialiased;
+  --webkit-font-smoothing: antialiased;
 }
 
 [data-component="bubble-ui"] .control,
@@ -76,8 +76,8 @@
   height: 0;
   transform: translateY(-16px) scaleY(.5);
   opacity: 0;
-  transition: height .2s ease-out, transform .2s ease-out,
-              opacity .2s ease-out;
+  transition: height 0.2s ease-out, transform 0.2s ease-out,
+              opacity 0.2s ease-out;
   will-change: height, transform, opacity;
   /* avoid interfering with the layout when closed */
   pointer-events: none;
@@ -93,14 +93,14 @@
 
 [data-component="bubble-ui"] .details > div
 {
-  transition: filter .2s ease-out, transform  .2s ease-out;
+  transition: filter 0.2s ease-out, transform  0.2s ease-out;
   will-change: filter, transform;
 }
 
 [data-component="bubble-ui"] main.options .details > div
 {
   filter: blur(5px);
-  transform: scale3d(.9, .9, .9);
+  transform: scale3d(.9, 0.9, 0.9);
   /* avoid being clickable once blurred */
   pointer-events: none;
 }
@@ -117,7 +117,7 @@
   padding-top: 16px;
   padding-bottom: 8px;
   font-size: 12px;
-  opacity: .25;
+  opacity: 0.25;
 }
 
 [data-component="bubble-ui"] .switcher-options button
@@ -131,8 +131,8 @@
   text-transform: uppercase;
   font-weight: 600;
   font-size: 12px;
-  transition: background .2s ease-out,
-              color .2s ease-out;
+  transition: background 0.2s ease-out,
+              color 0.2s ease-out;
   will-change: background, color;
 }
 
@@ -179,7 +179,7 @@
   border: 0;
   color: hsla(0,0%,63%,.6);
   background: none;
-  transition: color .2s ease-out;
+  transition: color 0.2s ease-out;
   will-change: color;
   font-size: inherit;
   cursor: pointer;
@@ -219,5 +219,5 @@ body[dir="rtl"] [data-component="bubble-ui"] footer
 [data-component="bubble-ui"] header input,
 [data-component="bubble-ui"] footer input
 {
-  opacity: .25;
+  opacity: 0.25;
 }
