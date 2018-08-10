@@ -5,7 +5,7 @@
 replaceAll(
   '.messageRow .content',
   /ui#(\d+)/g,
-  '<a target="_blank" href="https://gitlab.com/eyeo/adblockplus/adblockplusui/issues/$1">ui:$1</a>'
+  '<a target="_blank" href="https://gitlab.com/eyeo/adblockplus/abpui/adblockplusui/issues/$1">ui:$1</a>'
 );
  *
  * Alternatively, setup a mutation observer
@@ -16,7 +16,7 @@ replaceAll(
 replaceAuto(
   '.buffermainwrapper',
   /ui#(\d+)/g,
-  '<a target="_blank" href="https://gitlab.com/eyeo/adblockplus/adblockplusui/issues/$1">ui:$1</a>'
+  '<a target="_blank" href="https://gitlab.com/eyeo/adblockplus/abpui/adblockplusui/issues/$1">ui:$1</a>'
 );
  */
 
