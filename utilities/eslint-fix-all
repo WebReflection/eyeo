@@ -49,92 +49,37 @@ var fixes = {
   ],
   css: [
     /*
-      [attr=value]
+      #long-selector
+      .something
 
       becomes
 
-      [attr="value"]
+      #long-selector
+        .something
     */
     function (code) {
-      return code.replace(/\[([a-z-]+)=([a-z-]+)\]/g, '[$1="$2"]');
-    },
-
-    /*
-      tmp:before
-
-      becomes
-
-      tmp::before
-    */
-    function (code) {
-      return code.replace(/([^:]):(before|after)/g, '$1::$2');
-    },
-
-    /*
-      .3
-
-      becomes
-
-      0.3
-    */
-    function (code) {
-      return code.replace(/ (\.\d+)/g, ' 0$1');
-    },
-
-    /*
-      #selector {
-
-      becomes
-
-      #selector
-      {
-    */
-    function (code) {
-      return code.replace(/\s+\{$/mg, '\n{');
-    },
-
-    /*
-      #selector
-    {
-      }
-
-      becomes
-
-      #selector
-      {
-      }
-    */
-    function (code) {
-      return code.replace(
-        /^{$/mg,
-        function ($0, $1) {
-          var newLine = code.lastIndexOf('\n', $1 - 2);
-          var spaces = code.slice(newLine + 1, $1 - 1).match(/^(\s*)/)[1];
-          return spaces + '{';
+      const comments = [];
+      const lines = code.replace(/\/\*[\s\S]*?\*\//g, $0 => {
+        return '\x01' + (comments.push($0) - 1) + '\x01';
+      }).split('\n');
+      for (let i = lines.length; i--;) {
+        if (lines[i] === '{') {
+          while (i > 0 && lines[--i].length) {
+            let prev = lines[i - 1].trim();
+            if (
+              i > 0 &&
+              prev.length &&
+              !/[,\x01]$/.test(prev) &&
+              !/^\/\//.test(prev)
+            ) {
+              lines[i] = '  ' + lines[i];
+            }
+          }
         }
-      );
-    },
-
-    /*
-      #selector
-      {}
-      .class
-      {}
-
-      becomes
-
-      #selector
-      {}
-
-      .class
-      {}
-    */
-    function (code) {
-      return code.replace(/}\n(\S)/g, '}\n\n$1');
-    },
-
-    function (code) {
-      return code.replace(/}\n+}/g, '}\n}');
+      }
+      return lines.join('\n').replace(/\x01(\d+)\x01/g, ($0, $1) => {
+        return comments[$1];
+      });
     }
   ]
 };
@@ -158,18 +103,20 @@ if (/\.js$/.test(file)) {
       process.exit(code);
     });
 } else if (/\.s?css$/.test(file)) {
-  try {
-    fs.writeFileSync(
-      file,
-      fixes.css.reduce(
-        fix,
-        fs.readFileSync(file).toString()
-      )
-    );
-    process.exit(0);
-  } catch(o_O) {
-    process.exit(1);
-  }
+  require('child_process')
+    .spawn('stylelint', ['--fix', file])
+    .on('close', function (code) {
+      if (code === 0) {
+        fs.writeFileSync(
+          file,
+          fixes.css.reduce(
+            fix,
+            fs.readFileSync(file).toString()
+          )
+        );
+      }
+      process.exit(code);
+    });
 }
 
 function fix(content, fn) {
