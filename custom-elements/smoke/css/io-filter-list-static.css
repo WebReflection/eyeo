@@ -1,0 +1,181 @@
+@charset "UTF-8";
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-filter-list-static {
+  position: relative;
+  min-width: 500px;
+  padding: 0; }
+
+io-filter-list-static,
+io-filter-list-static *,
+io-filter-list-static *::before,
+io-filter-list-static *::after {
+  box-sizing: border-box; }
+
+io-filter-list-static table {
+  /* set as visible once populated */
+  visibility: hidden;
+  width: 100%;
+  border: 1px solid #9b9b9b;
+  color: #505050;
+  background-color: #fff; }
+
+io-filter-list-static thead {
+  user-select: none; }
+
+io-filter-list-static thead tr {
+  border-bottom: 1px solid #9b9b9b; }
+
+io-filter-list-static table.visible {
+  visibility: visible; }
+
+/* necessary to have scrollable tbody */
+io-filter-list-static thead tr,
+io-filter-list-static tbody {
+  display: block; }
+
+/* will show text either left or right instead of center */
+io-filter-list-static thead th {
+  font-weight: normal; }
+
+io-filter-list-static tbody {
+  overflow: auto;
+  max-height: 200px; }
+
+io-filter-list-static th,
+io-filter-list-static td {
+  min-width: 24px;
+  padding: 4px 8px;
+  text-align: center; }
+
+html:not([dir="rtl"]) io-filter-list-static td:last-child {
+  padding-right: 16px; }
+
+io-filter-list-static tbody tr {
+  height: var(--row-height, auto); }
+
+io-filter-list-static thead,
+io-filter-list-static tbody tr.odd {
+  background-color: #f1f1f1; }
+
+io-filter-list-static td {
+  outline: none; }
+
+io-filter-list-static [data-info="status"] {
+  width: var(--width-status, auto); }
+
+io-filter-list-static [data-info="rule"] {
+  overflow: hidden;
+  width: var(--width-rule, auto);
+  max-width: var(--width-rule, auto);
+  white-space: nowrap;
+  text-overflow: ellipsis; }
+
+io-filter-list-static [data-info="rule"]:focus {
+  white-space: initial; }
+
+html:not([dir="rtl"]) io-filter-list-static [data-info="rule"] {
+  text-align: left; }
+
+html[dir="rtl"] io-filter-list-static [data-info="rule"] {
+  text-align: right; }
+
+io-filter-list-static [data-info="warning"] {
+  width: var(--width-warning, auto); }
+
+io-filter-list-static [data-info="hits"] {
+  width: var(--width-hits, auto); }
+
+io-filter-list-static [data-info="remove"] {
+  width: var(--width-remove, auto); }
+
+io-filter-list-static [data-info="warning"] {
+  padding: 0; }
+
+io-filter-list-static [data-info="warning"] img {
+  width: 80%;
+  margin: auto; }
+
+io-filter-list-static [data-info="remove"] button {
+  display: block;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  background-image: url(icons/trash.svg?default#default);
+  background-repeat: none;
+  background-position: center;
+  background-size: contain; }
+
+io-filter-list-static [data-info="remove"] button:hover {
+  background-image: url(icons/trash.svg?hover#hover); }
+
+io-filter-list-static thead th::after {
+  display: inline-block;
+  visibility: hidden;
+  position: absolute;
+  padding: 4px;
+  font-size: 8px; }
+
+io-filter-list-static thead[data-dir="asc"] th::after {
+  content: "▼"; }
+
+io-filter-list-static thead[data-dir="desc"] th::after {
+  content: "▲"; }
+
+io-filter-list-static thead[data-sort="status"] th[data-info="status"]::after,
+io-filter-list-static thead[data-sort="rule"] th[data-info="rule"]::after,
+io-filter-list-static thead[data-sort="warning"] th[data-info="warning"]::after,
+io-filter-list-static thead[data-sort="hits"] th[data-info="hits"]::after {
+  visibility: visible; }
+
+io-filter-list-static > io-scrollbar {
+  position: absolute;
+  top: 30px;
+  bottom: 0; }
+
+html:not([dir="rtl"]) io-filter-list-static > io-scrollbar {
+  right: 0; }
+
+html[dir="rtl"] io-filter-list-static > io-scrollbar {
+  left: 0; }
+
+
+footer
+{
+  display: flex;
+  flex-direction: row;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+footer a
+{
+  display: block;
+  padding: 16px;
+  font-weight: bold;
+  text-align: center;
+  flex-grow: 1;
+}
+
+footer a, footer a:visited
+{
+  color: blue;
+  text-decoration: none;
+}

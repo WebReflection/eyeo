@@ -1,0 +1,58 @@
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-filter-list {
+  min-width: 500px;
+  padding: 0; }
+
+io-filter-list,
+io-filter-list *,
+io-filter-list *::before,
+io-filter-list *::after {
+  box-sizing: border-box; }
+
+io-filter-list table {
+  /* set as visible once populated */
+  visibility: hidden;
+  width: 100%; }
+
+io-filter-list table.visible {
+  visibility: visible; }
+
+/* necessary to have scrollable tbody */
+io-filter-list thead tr,
+io-filter-list tbody {
+  display: block; }
+
+/* will show text either left or right instead of center */
+io-filter-list thead th {
+  text-align: inherit; }
+
+io-filter-list tbody {
+  overflow-y: auto;
+  max-height: 200px; }
+
+io-filter-list th,
+io-filter-list td {
+  min-width: 24px;
+  padding: 4px; }
+
+io-filter-list tbody td[data-info="rule"] {
+  width: var(--width-for-rule, auto); }
+
+io-filter-list thead > *,
+io-filter-list tbody > * {
+  background-color: white; }

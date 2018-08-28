@@ -1,4 +1,4 @@
-/* eslint-disable */(function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
+/* eslint-disable */(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -18,9 +18,53 @@
 
 "use strict";
 
-const {wire} = require("./io-element");
+module.exports = {
+  $: (selector, container = document) => container.querySelector(selector),
+  $$: (selector, container = document) => container.querySelectorAll(selector),
+  // helper to provide the relative coordinates
+  // to the closest positioned containing element
+  relativeCoordinates(event)
+  {
+    let el = event.currentTarget;
+    let x = 0;
+    let y = 0;
+    do
+    {
+      x += el.offsetLeft - el.scrollLeft;
+      y += el.offsetTop - el.scrollTop;
+    } while (
+      (el = el.offsetParent) &&
+      !isNaN(el.offsetLeft) &&
+      !isNaN(el.offsetTop)
+    );
+    return {x: event.pageX - x, y: event.pageY - y};
+  }
+};
 
-// basic polyfill for older browsers
+},{}],2:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+"use strict";
+
+const {wire, utils} = require("./io-element");
+const {relativeCoordinates} = require("./dom");
+
+// use native rIC where available, fallback to setTimeout otherwise
 const requestIdleCallback = window.requestIdleCallback || setTimeout;
 
 // at this point this is just a helper class
@@ -30,7 +74,7 @@ module.exports = class DrawingHandler
 {
   constructor(canvas, maxSize)
   {
-    this.paths = [];
+    this.paths = new Set();
     this.canvas = canvas;
     this.maxSize = maxSize;
 
@@ -39,6 +83,11 @@ module.exports = class DrawingHandler
     canvas.width = canvasRect.width;
     canvas.height = canvasRect.height;
 
+    // define a ratio that will produce an image with at least
+    // 800px (maxSize) width and multiply by the device pixel ratio
+    // to preserve the image quality on HiDPi screens.
+    this.ratio = (maxSize / canvas.width) * (window.devicePixelRatio || 1);
+
     // it also needs to intercept all events
     if ("onpointerup" in canvas)
     {
@@ -46,6 +95,7 @@ module.exports = class DrawingHandler
       canvas.addEventListener("pointerdown", this, {passive: false});
       canvas.addEventListener("pointermove", this, {passive: false});
       canvas.addEventListener("pointerup", this, {passive: false});
+      document.addEventListener("pointerup", this, {passive: false});
     }
     else
     {
@@ -57,6 +107,7 @@ module.exports = class DrawingHandler
       canvas.addEventListener("mousedown", this, {passive: false});
       canvas.addEventListener("mousemove", this, {passive: false});
       canvas.addEventListener("mouseup", this, {passive: false});
+      document.addEventListener("mouseup", this, {passive: false});
     }
   }
 
@@ -68,29 +119,38 @@ module.exports = class DrawingHandler
   changeColorDepth(image)
   {
     this.clear();
-    const startW = image.naturalWidth;
-    const startH = image.naturalHeight;
-    const ratioW = Math.min(this.canvas.width, this.maxSize) / startW;
-    const ratioH = Math.min(this.canvas.height, this.maxSize) / startH;
-    const ratio = Math.min(ratioW, ratioH);
-    const endW = startW * ratio;
-    const endH = startH * ratio;
-    this.ctx.drawImage(image,
-                      0, 0, startW, startH,
-                      0, 0, endW, endH);
-    this.imageData = this.ctx.getImageData(
-                      0, 0, this.canvas.width, this.canvas.height);
+    const {naturalWidth, naturalHeight} = image;
+    const canvasWidth = this.canvas.width * this.ratio;
+    const canvasHeight = (canvasWidth * naturalHeight) / naturalWidth;
+    // resize the canvas to the displayed image size
+    // to preserve HiDPi pixels
+    this.canvas.width = canvasWidth;
+    this.canvas.height = canvasHeight;
+    // force its computed size in normal CSS pixels
+    this.canvas.style.width = Math.round(canvasWidth / this.ratio) + "px";
+    this.canvas.style.height = Math.round(canvasHeight / this.ratio) + "px";
+    // draw resized image accordingly with new dimensions
+    this.ctx.drawImage(image, 0, 0, naturalWidth, naturalHeight,
+                              0, 0, canvasWidth, canvasHeight);
+    // collect all info to process the iamge data
+    this.imageData = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
     const data = this.imageData.data;
+    const length = data.length;
     const mapping = [0x00, 0x55, 0xAA, 0xFF];
+    // don't loop all pixels at once, assuming devices
+    // capable of HiDPi images have also enough power
+    // to handle all those pixels.
+    const avoidBlocking = Math.round(5000 * this.ratio);
     return new Promise(resolve =>
     {
       const remap = i =>
       {
-        for (; i < data.length; i++)
+        for (; i < length; i++)
         {
           data[i] = mapping[data[i] >> 6];
-          if (i > 0 && i % 5000 == 0)
+          if (i > 0 && i % avoidBlocking == 0)
           {
+            notifyColorDepthChanges.call(this, i, length);
             // faster when possible, otherwise less intrusive
             // than a promise based on setTimeout as in legacy code
             return requestIdleCallback(() =>
@@ -100,6 +160,7 @@ module.exports = class DrawingHandler
             });
           }
         }
+        notifyColorDepthChanges.call(this, i, length);
         resolve();
       };
       remap(0);
@@ -112,12 +173,12 @@ module.exports = class DrawingHandler
     if (!this.ctx)
     {
       this.ctx = this.canvas.getContext("2d");
-      this.ctx.lineJoin = "round";
-      this.ctx.lineWidth = 4;
-      this.ctx.strokeStyle = "rgb(208, 1, 27)";
-      this.ctx.fillStyle = "rgb(0, 0, 0)";
     }
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.lineJoin = "round";
+    this.ctx.strokeStyle = "rgb(208, 1, 27)";
+    this.ctx.fillStyle = "rgb(0, 0, 0)";
+    this.ctx.lineWidth = 4 * this.ratio;
   }
 
   // draw the image during or after it's being processed
@@ -133,10 +194,10 @@ module.exports = class DrawingHandler
     {
       const method = `${rect.type}Rect`;
       this.ctx[method](
-        rect.x,
-        rect.y,
-        rect.width,
-        rect.height
+        rect.x * this.ratio,
+        rect.y * this.ratio,
+        rect.width * this.ratio,
+        rect.height * this.ratio
       );
     }
   }
@@ -152,13 +213,13 @@ module.exports = class DrawingHandler
   onpointerdown(event)
   {
     // avoid multiple pointers/fingers
-    if (this.drawing)
+    if (this.drawing || !utils.event.isLeftClick(event))
       return;
 
     // react only if not drawing already
     stop(event);
     this.drawing = true;
-    const start = getCoordinates(event);
+    const start = relativeCoordinates(event);
     // set current rect to speed up coordinates updates
     this.rect = {
       type: this.mode,
@@ -167,7 +228,7 @@ module.exports = class DrawingHandler
       width: 0,
       height: 0
     };
-    this.paths.push(this.rect);
+    this.paths.add(this.rect);
   }
 
   onpointermove(event)
@@ -192,22 +253,29 @@ module.exports = class DrawingHandler
       return;
 
     stop(event);
-    this.updateRect(event);
+    if (event.currentTarget === this.canvas)
+    {
+      this.updateRect(event);
+    }
+    this.draw();
     this.drawing = false;
 
     // get out of here if the mouse didn't move at all
     if (!this.rect.width && !this.rect.height)
     {
       // also drop current rect from the list: it's useless.
-      this.paths.pop();
+      this.paths.delete(this.rect);
       return;
     }
     const rect = this.rect;
     const parent = this.canvas.parentNode;
-    const closeCoords = getPageCoordinates(
-      event,
-      this.rect,
-      getCoordinates(event)
+    const closeCoords = getRelativeCoordinates(
+      this.canvas,
+      rect,
+      {
+        x: rect.x + rect.width,
+        y: rect.y + rect.height
+      }
     );
 
     // use the DOM to show the close event
@@ -219,11 +287,13 @@ module.exports = class DrawingHandler
         class="closer"
         onclick="${evt =>
         {
+          if (!utils.event.isLeftClick(evt))
+            return;
           // when clicked, remove the related rectangle
           // and draw the canvas again
           stop(evt);
           parent.removeChild(evt.currentTarget);
-          this.paths.splice(this.paths.indexOf(rect), 1);
+          this.paths.delete(rect);
           this.draw();
         }}"
         style="${{
@@ -231,43 +301,33 @@ module.exports = class DrawingHandler
           top: closeCoords.y + "px",
           left: closeCoords.x + "px"
         }}"
-      />`);
+      >
+        <img src="/skin/icons/delete.svg" />
+      </span>`);
   }
 
   // update current rectangle size
   updateRect(event)
   {
-    const coords = getCoordinates(event);
+    const coords = relativeCoordinates(event);
     this.rect.width = coords.x - this.rect.x;
     this.rect.height = coords.y - this.rect.y;
   }
 };
 
-// helper to retrieve absolute coordinates
-function getCoordinates(event)
+function notifyColorDepthChanges(value, max)
 {
-  let el = event.currentTarget;
-  let x = 0;
-  let y = 0;
-  do
-  {
-    x += el.offsetLeft - el.scrollLeft;
-    y += el.offsetTop - el.scrollTop;
-  } while (
-    (el = el.offsetParent) &&
-    !isNaN(el.offsetLeft) &&
-    !isNaN(el.offsetTop)
-  );
-  return {x: event.clientX - x, y: event.clientY - y};
+  const info = {detail: {value, max}};
+  const ioHighlighter = this.canvas.closest("io-highlighter");
+  ioHighlighter.dispatchEvent(new CustomEvent("changecolordepth", info));
 }
 
 // helper to retrieve absolute page coordinates
 // of a generic target node
-function getPageCoordinates(event, start, end)
+function getRelativeCoordinates(canvas, start, end)
 {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const x = ("x" in rect ? rect.x : rect.left) + Math.max(start.x, end.x);
-  const y = ("y" in rect ? rect.y : rect.top) + Math.min(start.y, end.y);
+  const x = Math.max(start.x, end.x) + canvas.offsetLeft;
+  const y = Math.min(start.y, end.y) + canvas.offsetTop;
   return {x: Math.round(x), y: Math.round(y)};
 }
 
@@ -279,7 +339,7 @@ function stop(event)
   event.stopPropagation();
 }
 
-},{"./io-element":2}],2:[function(require,module,exports){
+},{"./dom":1,"./io-element":3}],3:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -350,6 +410,18 @@ const DOMUtils = {
         }
       }
       return !!value;
+    }
+  },
+
+  event: {
+    // returns true if it's a left click or a touch event.
+    // The left mouse button value is 0 and this
+    // is compatible with pointers/touch events
+    // where `button` might not be there.
+    isLeftClick(event)
+    {
+      const re = /^(?:click|mouse|touch|pointer)/;
+      return re.test(event.type) && !event.button;
     }
   }
 };
@@ -426,7 +498,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":4,"hyperhtml-element/cjs":5}],3:[function(require,module,exports){
+},{"document-register-element/pony":5,"hyperhtml-element/cjs":6}],4:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -449,6 +521,8 @@ module.exports = IOElement;
 const IOElement = require("./io-element");
 const DrawingHandler = require("./drawing-handler");
 
+const {utils} = IOElement;
+
 // <io-highlighter data-max-size=800 />
 class IOHighlighter extends IOElement
 {
@@ -466,17 +540,23 @@ class IOHighlighter extends IOElement
     return this.state.changeDepth;
   }
 
+  // returns true if there were hidden/highlighted areas
+  get edited()
+  {
+    return this.drawingHandler ? this.drawingHandler.paths.size > 0 : false;
+  }
+
   // process an image and setup changeDepth promise
   // returns the component for chainability sake
   // comp.edit(imageOrString).changeDepth.then(...);
   edit(source)
   {
     return this.setState({
-      changeDepth: new Promise(res =>
+      changeDepth: new Promise((res, rej) =>
       {
         const changeDepth = image =>
         {
-          this.drawingHandler.changeColorDepth(image).then(res);
+          this.drawingHandler.changeColorDepth(image).then(res, rej);
         };
 
         if (typeof source === "string")
@@ -484,6 +564,7 @@ class IOHighlighter extends IOElement
           // create an image and use the source as data
           const img = this.ownerDocument.createElement("img");
           img.onload = () => changeDepth(img);
+          img.onerror = rej;
           img.src = source;
         }
         else
@@ -499,29 +580,42 @@ class IOHighlighter extends IOElement
   // the component content (invoked automatically on state change too)
   render()
   {
-    // extra classes for highlight and edit
-    const highClass = this.state.drawing === "highlight" ? " active" : "";
-    const hideClass = this.state.drawing === "hide" ? " active" : "";
+    if (this.state.drawing)
+      this.setAttribute("drawing", this.state.drawing);
+    else
+      this.removeAttribute("drawing");
 
     this.html`
     <div class="split">
       <div class="options">
         <button
           tabindex="-1"
-          class="${"highlight" + highClass}"
-          onclick="${() => changeMode(this, "highlight")}"
+          class="highlight"
+          onclick="${
+            event =>
+            {
+              if (utils.event.isLeftClick(event))
+                changeMode(this, "highlight");
+            }
+          }"
         >
           ${{i18n: "issueReporter_screenshot_highlight"}}
         </button>
         <button
           tabindex="-1"
-          class="${"hide" + hideClass}"
-          onclick="${() => changeMode(this, "hide")}"
+          class="hide"
+          onclick="${
+            event =>
+            {
+              if (utils.event.isLeftClick(event))
+                changeMode(this, "hide");
+            }
+          }"
         >
           ${{i18n: "issueReporter_screenshot_hide"}}
         </button>
       </div>
-      <canvas class="${this.state.drawing ? "active" : ""}" />
+      <canvas />
     </div>`;
 
     // first time only, initialize the DrawingHandler
@@ -549,28 +643,23 @@ const changeMode = (self, mode) =>
   self.setState({drawing});
 };
 
-},{"./drawing-handler":1,"./io-element":2}],4:[function(require,module,exports){
+},{"./drawing-handler":2,"./io-element":3}],5:[function(require,module,exports){
 /*!
+ISC License
 
-Copyright (C) 2014-2016 by Andrea Giammarchi - @WebReflection
+Copyright (c) 2014-2018, Andrea Giammarchi, @WebReflection
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
 
 */
 // global window Object
@@ -1204,6 +1293,7 @@ function installCustomElements(window, polyfill) {'use strict';
   
     // replaced later on
     createElement = document.createElement,
+    importNode = document.importNode,
     patchedCreateElement = createElement,
   
     // shared observer for all attributes
@@ -1248,8 +1338,41 @@ function installCustomElements(window, polyfill) {'use strict';
     // will check proto or the expando attribute
     // in order to setup the node once
     patchIfNotAlready,
-    patch
+    patch,
+  
+    // used for tests
+    tmp
   ;
+  
+  // IE11 disconnectedCallback issue #
+  // to be tested before any createElement patch
+  if (MutationObserver) {
+    // original fix:
+    // https://github.com/javan/mutation-observer-inner-html-shim
+    tmp = document.createElement('div');
+    tmp.innerHTML = '<div><div></div></div>';
+    new MutationObserver(function (mutations, observer) {
+      if (
+        mutations[0] &&
+        mutations[0].type == 'childList' &&
+        !mutations[0].removedNodes[0].childNodes.length
+      ) {
+        tmp = gOPD(HTMLElementPrototype, 'innerHTML');
+        var set = tmp && tmp.set;
+        if (set)
+          defineProperty(HTMLElementPrototype, 'innerHTML', {
+            set: function (value) {
+              while (this.lastChild)
+                this.removeChild(this.lastChild);
+              set.call(this, value);
+            }
+          });
+      }
+      observer.disconnect();
+      tmp = null;
+    }).observe(tmp, {childList: true, subtree: true});
+    tmp.innerHTML = "";
+  }
   
   // only if needed
   if (!V0) {
@@ -1502,14 +1625,26 @@ function installCustomElements(window, polyfill) {'use strict';
         document[ADD_EVENT_LISTENER](DOM_CONTENT_LOADED, onReadyStateChange);
         document[ADD_EVENT_LISTENER]('readystatechange', onReadyStateChange);
   
+        document.importNode = function (node, deep) {
+          switch (node.nodeType) {
+            case 1:
+              return setupAll(document, importNode, [node, !!deep]);
+            case 11:
+              for (var
+                fragment = document.createDocumentFragment(),
+                childNodes = node.childNodes,
+                length = childNodes.length,
+                i = 0; i < length; i++
+              )
+                fragment.appendChild(document.importNode(childNodes[i], !!deep));
+              return fragment;
+            default:
+              return cloneNode.call(node, !!deep);
+          }
+        };
+  
         HTMLElementPrototype.cloneNode = function (deep) {
-          var
-            node = cloneNode.call(this, !!deep),
-            i = getTypeIndex(node)
-          ;
-          if (-1 < i) patch(node, protos[i]);
-          if (deep && query.length) loopAndSetup(node.querySelectorAll(query));
-          return node;
+          return setupAll(this, cloneNode, [!!deep]);
         };
       }
   
@@ -1702,6 +1837,17 @@ function installCustomElements(window, polyfill) {'use strict';
     onSubtreeModified.call(self, {target: self});
   }
   
+  function setupAll(context, callback, args) {
+    var
+      node = callback.apply(context, args),
+      i = getTypeIndex(node)
+    ;
+    if (-1 < i) patch(node, protos[i]);
+    if (args.pop() && query.length)
+      loopAndSetup(node.querySelectorAll(query));
+    return node;
+  }
+  
   function setupNode(node, proto) {
     setPrototype(node, proto);
     if (observer) {
@@ -1836,8 +1982,10 @@ function installCustomElements(window, polyfill) {'use strict';
     });
     safeProperty(proto, ATTRIBUTE_CHANGED_CALLBACK, {
       value: function (name) {
-        if (-1 < indexOf.call(attributes, name))
-          CProto[ATTRIBUTE_CHANGED_CALLBACK].apply(this, arguments);
+        if (-1 < indexOf.call(attributes, name)) {
+          if (CProto[ATTRIBUTE_CHANGED_CALLBACK])
+            CProto[ATTRIBUTE_CHANGED_CALLBACK].apply(this, arguments);
+        }
       }
     });
     if (CProto[CONNECTED_CALLBACK]) {
@@ -1963,13 +2111,14 @@ function installCustomElements(window, polyfill) {'use strict';
     // if available test extends work as expected
     try {
       (function (DRE, options, name) {
+        var re = new RegExp('^<a\\s+is=(\'|")' + name + '\\1></a>$');
         options[EXTENDS] = 'a';
         DRE.prototype = create(HTMLAnchorElement.prototype);
         DRE.prototype.constructor = DRE;
         window.customElements.define(name, DRE, options);
         if (
-          getAttribute.call(document.createElement('a', {is: name}), 'is') !== name ||
-          (usableCustomElements && getAttribute.call(new DRE(), 'is') !== name)
+          !re.test(document.createElement('a', {is: name}).outerHTML) ||
+          !re.test((new DRE()).outerHTML)
         ) {
           throw options;
         }
@@ -2002,22 +2151,32 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 'use strict';
-/*! (C) 2017 Andrea Giammarchi - ISC Style License */
+/*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
 const {Component, bind, define, hyper, wire} = require('hyperhtml/cjs');
 
-const _init$ = {value: false};
-
-const defineProperty = Object.defineProperty;
+// utils to deal with custom elements builtin extends
+const O = Object;
+const classes = [];
+const defineProperties = O.defineProperties;
+const defineProperty = O.defineProperty;
+const getOwnPropertyDescriptor = O.getOwnPropertyDescriptor;
+const getOwnPropertyNames = O.getOwnPropertyNames;
+const getOwnPropertySymbols = O.getOwnPropertySymbols || (() => []);
+const getPrototypeOf = O.getPrototypeOf || (o => o.__proto__);
+const ownKeys = typeof Reflect === 'object' && Reflect.ownKeys ||
+                (o => getOwnPropertyNames(o).concat(getOwnPropertySymbols(o)));
+const setPrototypeOf = O.setPrototypeOf ||
+                      ((o, p) => (o.__proto__ = p, o));
 
 class HyperHTMLElement extends HTMLElement {
 
   // define a custom-element in the CustomElementsRegistry
   // class MyEl extends HyperHTMLElement {}
   // MyEl.define('my-el');
-  static define(name) {
+  static define(name, options) {
     const Class = this;
     const proto = Class.prototype;
 
@@ -2043,11 +2202,11 @@ class HyperHTMLElement extends HTMLElement {
     const onChanged = proto.attributeChangedCallback;
     const hasChange = !!onChanged;
 
-    // created() {} is the entry point to do whatever you want.
-    // Once the node is live and upgraded as Custom Element.
-    // This method grants to be triggered at the right time,
-    // which is always once, and right before either
-    // attributeChangedCallback or connectedCallback
+    // created() {} is an initializer method that grants
+    // the node is fully known to the browser.
+    // It is ensured to run either after DOMContentLoaded,
+    // or once there is a next sibling (stream-friendly) so that
+    // you have full access to element attributes and/or childNodes.
     const created = proto.created;
     if (created) {
       // used to ensure create() is called once and once only
@@ -2069,9 +2228,11 @@ class HyperHTMLElement extends HTMLElement {
         'attributeChangedCallback',
         {
           configurable: true,
-          value(name, prev, curr) {
+          value: function aCC(name, prev, curr) {
             if (this._init$) {
-              created.call(defineProperty(this, '_init$', _init$));
+              checkReady.call(this, created);
+              if (this._init$)
+                return this._init$$.push(aCC.bind(this, name, prev, curr));
             }
             // ensure setting same value twice
             // won't trigger twice attributeChangedCallback
@@ -2092,9 +2253,11 @@ class HyperHTMLElement extends HTMLElement {
         'connectedCallback',
         {
           configurable: true,
-          value() {
+          value: function cC() {
             if (this._init$) {
-              created.call(defineProperty(this, '_init$', _init$));
+              checkReady.call(this, created);
+              if (this._init$)
+                return this._init$$.push(cC.bind(this));
             }
             if (hasConnect) {
               onConnected.apply(this, arguments);
@@ -2125,7 +2288,7 @@ class HyperHTMLElement extends HTMLElement {
     // define lazily all handlers
     // class { handleClick() { ... }
     // render() { `<a onclick=${this.handleClick}>` } }
-    Object.getOwnPropertyNames(proto).forEach(key => {
+    getOwnPropertyNames(proto).forEach(key => {
       if (/^handle[A-Z]/.test(key)) {
         const _key$ = '_' + key + '$';
         const method = proto[key];
@@ -2165,7 +2328,34 @@ class HyperHTMLElement extends HTMLElement {
       );
     }
 
-    customElements.define(name, Class);
+    if (options && options.extends) {
+      const Native = document.createElement(options.extends).constructor;
+      const Intermediate = class extends Native {};
+      const Super = getPrototypeOf(Class);
+      ownKeys(Super)
+        .filter(key => [
+          'length', 'name', 'arguments', 'caller', 'prototype'
+        ].indexOf(key) < 0)
+        .forEach(key => defineProperty(
+          Intermediate,
+          key,
+          getOwnPropertyDescriptor(Super, key)
+        )
+      );
+      ownKeys(Super.prototype)
+        .forEach(key => defineProperty(
+          Intermediate.prototype,
+          key,
+          getOwnPropertyDescriptor(Super.prototype, key)
+        )
+      );
+      setPrototypeOf(Class, Intermediate);
+      setPrototypeOf(proto, Intermediate.prototype);
+      customElements.define(name, Class, options);
+    } else {
+      customElements.define(name, Class);
+    }
+    classes.push(Class);
     return Class;
   }
 
@@ -2233,11 +2423,76 @@ HyperHTMLElement.intent = define;
 HyperHTMLElement.wire = wire;
 HyperHTMLElement.hyper = hyper;
 
+try {
+  if (Symbol.hasInstance) classes.push(
+    defineProperty(HyperHTMLElement, Symbol.hasInstance, {
+      enumerable: false,
+      configurable: true,
+      value(instance) {
+        return classes.some(isPrototypeOf, getPrototypeOf(instance));
+      }
+    }));
+} catch(meh) {}
+
 Object.defineProperty(exports, '__esModule', {value: true}).default = HyperHTMLElement;
 
-},{"hyperhtml/cjs":10}],6:[function(require,module,exports){
+// ------------------------------//
+// DOMContentLoaded VS created() //
+// ------------------------------//
+const dom = {
+  type: 'DOMContentLoaded',
+  handleEvent() {
+    if (dom.ready()) {
+      document.removeEventListener(dom.type, dom, false);
+      dom.list.splice(0).forEach(invoke);
+    }
+    else
+      setTimeout(dom.handleEvent);
+  },
+  ready() {
+    return document.readyState === 'complete';
+  },
+  list: []
+};
+
+if (!dom.ready()) {
+  document.addEventListener(dom.type, dom, false);
+}
+
+function checkReady(created) {
+  if (dom.ready() || isReady.call(this, created)) {
+    if (this._init$) {
+      const list = this._init$$;
+      if (list) delete this._init$$;
+      created.call(defineProperty(this, '_init$', {value: false}));
+      if (list) list.forEach(invoke);
+    }
+  } else {
+    if (!this.hasOwnProperty('_init$$'))
+      defineProperty(this, '_init$$', {configurable: true, value: []});
+    dom.list.push(checkReady.bind(this, created));
+  }
+}
+
+function invoke(fn) {
+  fn();
+}
+
+function isPrototypeOf(Class) {
+  return this === Class.prototype;
+}
+
+function isReady(created) {
+  let el = this;
+  do { if (el.nextSibling) return true; }
+  while (el = el.parentNode);
+  setTimeout(checkReady.bind(this, created));
+  return false;
+}
+
+},{"hyperhtml/cjs":11}],7:[function(require,module,exports){
 'use strict';
-const { WeakMap } = require('../shared/poorlyfills.js');
+const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
 // hyperHTML.Component is a very basic class
 // able to create Custom Elements like components
@@ -2264,18 +2519,24 @@ function setup(content) {
     return component;
   };
   const get = (Class, info, context, id) => {
+    const relation = info.get(Class) || relate(Class, info);
     switch (typeof id) {
       case 'object':
       case 'function':
-        const wm = info.w || (info.w = new WeakMap);
+        const wm = relation.w || (relation.w = new WeakMap);
         return wm.get(id) || createEntry(wm, id, new Class(context));
       default:
-        const sm = info.p || (info.p = create(null));
+        const sm = relation.p || (relation.p = create(null));
         return sm[id] || (sm[id] = new Class(context));
     }
   };
+  const relate = (Class, info) => {
+    const relation = {w: null, p: null};
+    info.set(Class, relation);
+    return relation;
+  };
   const set = context => {
-    const info = {w: null, p: null};
+    const info = new Map;
     children.set(context, info);
     return info;
   };
@@ -2290,8 +2551,13 @@ function setup(content) {
       for: {
         configurable: true,
         value(context, id) {
-          const info = children.get(context) || set(context);
-          return get(this, info, context, id == null ? 'default' : id);
+          return get(
+            this,
+            children.get(context) || set(context),
+            context,
+            id == null ?
+              'default' : id
+          );
         }
       }
     }
@@ -2350,7 +2616,7 @@ const lazyGetter = (type, fn) => {
   };
 };
 
-},{"../shared/poorlyfills.js":19}],7:[function(require,module,exports){
+},{"../shared/poorlyfills.js":20}],8:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -2385,15 +2651,16 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":17,"../shared/utils.js":21}],8:[function(require,module,exports){
+},{"../shared/easy-dom.js":18,"../shared/utils.js":22}],9:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
-const {UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
+const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
 const Updates = (m => m.__esModule ? m.default : m)(require('../objects/Updates.js'));
 const {
   createFragment,
   importNode,
-  unique
+  unique,
+  TemplateMap
 } = require('../shared/utils.js');
 
 const {selfClosing} = require('../shared/re.js');
@@ -2402,10 +2669,8 @@ const {selfClosing} = require('../shared/re.js');
 // are already known to hyperHTML
 const bewitched = new WeakMap;
 
-// the collection of all template literals
-// since these are unique and immutable
-// for the whole application life-cycle
-const templates = new Map;
+// all unique template literals
+const templates = TemplateMap();
 
 // better known as hyper.bind(node), the render is
 // the main tag function in charge of fully upgrading
@@ -2468,7 +2733,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":14,"../shared/constants.js":15,"../shared/poorlyfills.js":19,"../shared/re.js":20,"../shared/utils.js":21}],9:[function(require,module,exports){
+},{"../objects/Updates.js":15,"../shared/constants.js":16,"../shared/poorlyfills.js":20,"../shared/re.js":21,"../shared/utils.js":22}],10:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -2568,7 +2833,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":7,"../shared/constants.js":15,"../shared/easy-dom.js":17,"../shared/poorlyfills.js":19,"../shared/utils.js":21,"./render.js":8}],10:[function(require,module,exports){
+},{"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./render.js":9}],11:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -2630,7 +2895,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./classes/Component.js":6,"./hyper/render.js":8,"./hyper/wire.js":9,"./objects/Intent.js":11,"./shared/domdiff.js":16}],11:[function(require,module,exports){
+},{"./classes/Component.js":7,"./hyper/render.js":9,"./hyper/wire.js":10,"./objects/Intent.js":12,"./shared/domdiff.js":17}],12:[function(require,module,exports){
 'use strict';
 const intents = {};
 const keys = [];
@@ -2664,7 +2929,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -2724,7 +2989,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":15}],13:[function(require,module,exports){
+},{"../shared/constants.js":16}],14:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -2797,7 +3062,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -2813,7 +3078,7 @@ const domdiff = (m => m.__esModule ? m.default : m)(require('../shared/domdiff.j
 // import { create as createElement, text } from '../shared/easy-dom.js';
 const { text } = require('../shared/easy-dom.js');
 const { Event, WeakSet, isArray, trim } = require('../shared/poorlyfills.js');
-const { createFragment, slice } = require('../shared/utils.js');
+const { createFragment, getChildren, slice } = require('../shared/utils.js');
 
 // hyper.Component have a connected/disconnected
 // mechanism provided by MutationObserver
@@ -3024,6 +3289,7 @@ const isPromise_ish = value => value != null && 'then' in value;
 //  * it's an Array, resolve all values if Promises and/or
 //    update the node with the resulting list of content
 const setAnyContent = (node, childNodes) => {
+  const diffOptions = {node: asNode, before: node};
   let fastPath = false;
   let oldValue;
   const anyContent = value => {
@@ -3043,8 +3309,7 @@ const setAnyContent = (node, childNodes) => {
             node.parentNode,
             childNodes,
             [text(node, value)],
-            asNode,
-            node
+            diffOptions
           );
         }
         break;
@@ -3056,8 +3321,7 @@ const setAnyContent = (node, childNodes) => {
             node.parentNode,
             childNodes,
             [],
-            asNode,
-            node
+            diffOptions
           );
           break;
         }
@@ -3071,8 +3335,7 @@ const setAnyContent = (node, childNodes) => {
                 node.parentNode,
                 childNodes,
                 [],
-                asNode,
-                node
+                diffOptions
               );
             }
           } else {
@@ -3095,8 +3358,7 @@ const setAnyContent = (node, childNodes) => {
                   node.parentNode,
                   childNodes,
                   value,
-                  asNode,
-                  node
+                  diffOptions
                 );
                 break;
             }
@@ -3108,8 +3370,7 @@ const setAnyContent = (node, childNodes) => {
             value.nodeType === DOCUMENT_FRAGMENT_NODE ?
               slice.call(value.childNodes) :
               [value],
-            asNode,
-            node
+            diffOptions
           );
         } else if (isPromise_ish(value)) {
           value.then(anyContent);
@@ -3129,8 +3390,7 @@ const setAnyContent = (node, childNodes) => {
                 [].concat(value.html).join('')
               ).childNodes
             ),
-            asNode,
-            node
+            diffOptions
           );
         } else if ('length' in value) {
           anyContent(slice.call(value));
@@ -3290,7 +3550,8 @@ function observe() {
       node.dispatchEvent(event);
     }
 
-    const children = node.children;
+    /* istanbul ignore next */
+    const children = node.children || getChildren(node);
     const length = children.length;
     for (let i = 0; i < length; i++) {
       dispatchTarget(children[i], event);
@@ -3319,7 +3580,7 @@ function observe() {
   }
 }
 
-},{"../classes/Component.js":6,"../classes/Wire.js":7,"../shared/constants.js":15,"../shared/domdiff.js":16,"../shared/easy-dom.js":17,"../shared/poorlyfills.js":19,"../shared/utils.js":21,"./Intent.js":11,"./Path.js":12,"./Style.js":13}],15:[function(require,module,exports){
+},{"../classes/Component.js":7,"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/domdiff.js":17,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./Intent.js":12,"./Path.js":13,"./Style.js":14}],16:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -3364,7 +3625,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 /*! (c) 2017 Andrea Giammarchi (ISC) */
@@ -3375,24 +3636,35 @@ exports.UIDC = UIDC;
  * @credits https://github.com/snabbdom/snabbdom
  */
 
+const eqeq = (a, b) => a == b;
+
 const identity = O => O;
 
-const remove = (parentNode, before, after) => {
-  const range = parentNode.ownerDocument.createRange();
-  range.setStartBefore(before);
-  range.setEndAfter(after);
-  range.deleteContents();
+const remove = (get, parentNode, before, after) => {
+  if (after == null) {
+    parentNode.removeChild(get(before, -1));
+  } else {
+    const range = parentNode.ownerDocument.createRange();
+    range.setStartBefore(get(before, -1));
+    range.setEndAfter(get(after, -1));
+    range.deleteContents();
+  }
 };
 
 const domdiff = (
   parentNode,     // where changes happen
   currentNodes,   // Array of current items/nodes
   futureNodes,    // Array of future items/nodes
-  getNode,        // optional way to retrieve a node from an item
-  beforeNode      // optional item/node to use as insertBefore delimiter
+  options         // optional object with one of the following properties
+                  //  before: domNode
+                  //  compare(generic, generic) => true if same generic
+                  //  node(generic) => Node
 ) => {
-  const get = getNode || identity;
-  const before = beforeNode == null ? null : get(beforeNode, 0);
+  if (!options)
+    options = {};
+  const compare = options.compare || eqeq;
+  const get = options.node || identity;
+  const before = options.before == null ? null : get(options.before, 0);
   let currentStart = 0, futureStart = 0;
   let currentEnd = currentNodes.length - 1;
   let currentStartNode = currentNodes[0];
@@ -3413,15 +3685,15 @@ const domdiff = (
     else if (futureEndNode == null) {
       futureEndNode = futureNodes[--futureEnd];
     }
-    else if (currentStartNode == futureStartNode) {
+    else if (compare(currentStartNode, futureStartNode)) {
       currentStartNode = currentNodes[++currentStart];
       futureStartNode = futureNodes[++futureStart];
     }
-    else if (currentEndNode == futureEndNode) {
+    else if (compare(currentEndNode, futureEndNode)) {
       currentEndNode = currentNodes[--currentEnd];
       futureEndNode = futureNodes[--futureEnd];
     }
-    else if (currentStartNode == futureEndNode) {
+    else if (compare(currentStartNode, futureEndNode)) {
       parentNode.insertBefore(
         get(currentStartNode, 1),
         get(currentEndNode, -0).nextSibling
@@ -3429,7 +3701,7 @@ const domdiff = (
       currentStartNode = currentNodes[++currentStart];
       futureEndNode = futureNodes[--futureEnd];
     }
-    else if (currentEndNode == futureStartNode) {
+    else if (compare(currentEndNode, futureStartNode)) {
       parentNode.insertBefore(
         get(currentEndNode, 1),
         get(currentStartNode, 0)
@@ -3462,9 +3734,10 @@ const domdiff = (
             parentNode.removeChild(get(currentStartNode, -1));
           } else {
             remove(
+              get,
               parentNode,
-              get(currentStartNode, -1),
-              get(currentNodes[index], -1)
+              currentStartNode,
+              currentNodes[index]
             );
           }
           currentStart = i;
@@ -3496,15 +3769,17 @@ const domdiff = (
       }
     }
     else {
-      if (currentNodes[currentStart] == null) currentStart++;
+      if (currentNodes[currentStart] == null)
+        currentStart++;
       if (currentStart === currentEnd) {
         parentNode.removeChild(get(currentNodes[currentStart], -1));
       }
       else {
         remove(
+          get,
           parentNode,
-          get(currentNodes[currentStart], -1),
-          get(currentNodes[currentEnd], -1)
+          currentNodes[currentStart],
+          currentNodes[currentEnd]
         );
       }
     }
@@ -3514,7 +3789,7 @@ const domdiff = (
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -3526,7 +3801,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -3553,7 +3828,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":17}],19:[function(require,module,exports){
+},{"./easy-dom.js":18}],20:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -3576,6 +3851,7 @@ try {
 exports.Event = Event;
 
 // used to store template literals
+/* istanbul ignore next */
 const Map = G.Map || function Map() {
   const keys = [], values = [];
   return {
@@ -3590,11 +3866,13 @@ const Map = G.Map || function Map() {
 exports.Map = Map;
 
 // used to store wired content
+let ID = 0;
 const WeakMap = G.WeakMap || function WeakMap() {
+  const key = UID + ID++;
   return {
-    get(obj) { return obj[UID]; },
+    get(obj) { return obj[key]; },
     set(obj, value) {
-      Object.defineProperty(obj, UID, {
+      Object.defineProperty(obj, key, {
         configurable: true,
         value
       });
@@ -3624,7 +3902,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":15}],20:[function(require,module,exports){
+},{"./constants.js":16}],21:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -3649,12 +3927,13 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
 const {
   G,
+  ELEMENT_NODE,
   OWNER_SVG_ELEMENT,
   SVG_NAMESPACE,
   UID,
@@ -3669,6 +3948,8 @@ const {
 } = require('./features-detection.js');
 
 const {create, doc, fragment} = require('./easy-dom.js');
+
+const {Map, WeakMap} = require('./poorlyfills.js');
 
 // appends an array of nodes
 // to a generic node/fragment
@@ -3732,6 +4013,20 @@ const cloneNode = hasDoomedCloneNode ?
   /* istanbul ignore next */
   node => node.cloneNode(true);
 
+// IE and Edge do not support children in SVG nodes
+/* istanbul ignore next */
+const getChildren = node => {
+  const children = [];
+  const childNodes = node.childNodes;
+  const length = childNodes.length;
+  for (let i = 0; i < length; i++) {
+    if (childNodes[i].nodeType === ELEMENT_NODE)
+      children.push(childNodes[i]);
+  }
+  return children;
+};
+exports.getChildren = getChildren;
+
 // used to import html into fragments
 const importNode = hasImportNode ?
   (doc, node) => doc.importNode(node, true) :
@@ -3758,32 +4053,45 @@ exports.unique = unique;
 // TL returns a unique version of the template
 // it needs lazy feature detection
 // (cannot trust literals with transpiled code)
-let TL = template => {
+let TL = t => {
   if (
     // TypeScript template literals are not standard
-    template.propertyIsEnumerable('raw') ||
+    t.propertyIsEnumerable('raw') ||
     (
-      // Firefox < 55 has not standard implementation neither
-      /Firefox\/(\d+)/.test((G.navigator || {}).userAgent) &&
-      parseFloat(RegExp.$1) < 55
-    )
+        // Firefox < 55 has not standard implementation neither
+        /Firefox\/(\d+)/.test((G.navigator || {}).userAgent) &&
+          parseFloat(RegExp.$1) < 55
+        )
   ) {
-    // in these cases, address templates once
-    const templateObjects = {};
-    // but always return the same template
-    TL = template => {
-      const key = '_' + template.join(UID);
-      return templateObjects[key] || (
-        templateObjects[key] = template
-      );
+    const T = {};
+    TL = t => {
+      const k = '^' + t.join('^');
+      return T[k] || (T[k] = t);
     };
-  }
-  else {
+  } else {
     // make TL an identity like function
-    TL = template => template;
+    TL = t => t;
   }
-  return TL(template);
+  return TL(t);
 };
+
+// used to store templates objects
+// since neither Map nor WeakMap are safe
+const TemplateMap = () => {
+  try {
+    const wm = new WeakMap;
+    const o_O = Object.freeze([]);
+    wm.set(o_O, true);
+    if (!wm.get(o_O))
+      throw o_O;
+    return wm;
+  } catch(o_O) {
+    // inevitable legacy code leaks due
+    // https://github.com/tc39/ecma262/pull/890
+    return new Map;
+  }
+};
+exports.TemplateMap = TemplateMap;
 
 // create document fragments via native template
 // with a fallback for browsers that won't be able
@@ -3826,7 +4134,7 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":15,"./easy-dom.js":17,"./features-detection.js":18,"./re.js":20}],22:[function(require,module,exports){
+},{"./constants.js":16,"./easy-dom.js":18,"./features-detection.js":19,"./poorlyfills.js":20,"./re.js":21}],23:[function(require,module,exports){
 /* globals require */
 
 "use strict";
@@ -3849,4 +4157,4 @@ document.addEventListener(
   }
 );
 
-},{"../js/io-highlighter":3}]},{},[22]);
+},{"../js/io-highlighter":4}]},{},[23]);

@@ -1,5 +1,20 @@
-/* eslint-disable */(function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
-/* globals module, require */
+/* eslint-disable */(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 "use strict";
 
@@ -11,12 +26,77 @@ if (typeof customElements !== "object")
 // external dependencies
 const {default: HyperHTMLElement} = require("hyperhtml-element/cjs");
 
+// common DOM utilities exposed as IOElement.utils
+const DOMUtils = {
+
+  // boolean related operations/helpers
+  boolean: {
+    // utils.boolean.attribute(node, name, setAsTrue):void
+    // set a generic node attribute name as "true"
+    // if value is a boolean one or it removes the attribute
+    attribute(node, name, setAsTrue)
+    {
+      // don't use `this.value(value)` with `this` as context
+      // to make destructuring of helpers always work.
+      // @example
+      // const {attribute: setBoolAttr} = IOElement.utils.boolean;
+      // setBoolAttr(node, 'test', true);
+      if (DOMUtils.boolean.value(setAsTrue))
+      {
+        node.setAttribute(name, "true");
+      }
+      else
+      {
+        node.removeAttribute(name);
+      }
+    },
+
+    // utils.boolean.value(any):boolean
+    // it returns either true or false
+    // via truthy or falsy values, but also via strings
+    // representing "true", "false" as well as "0" or "1"
+    value(value)
+    {
+      if (typeof value === "string" && value.length)
+      {
+        try
+        {
+          value = JSON.parse(value);
+        }
+        catch (error)
+        {
+          // Ignore invalid JSON to continue using value as string
+        }
+      }
+      return !!value;
+    }
+  },
+
+  event: {
+    // returns true if it's a left click or a touch event.
+    // The left mouse button value is 0 and this
+    // is compatible with pointers/touch events
+    // where `button` might not be there.
+    isLeftClick(event)
+    {
+      const re = /^(?:click|mouse|touch|pointer)/;
+      return re.test(event.type) && !event.button;
+    }
+  }
+};
+
 // provides a unique-id suffix per each component
 let counter = 0;
 
 // common Custom Element class to extend
 class IOElement extends HyperHTMLElement
 {
+  // exposes DOM helpers as read only utils
+  static get utils()
+  {
+    return DOMUtils;
+  }
+
   // get a unique ID or, if null, set one and returns it
   static getID(element)
   {
@@ -42,6 +122,23 @@ class IOElement extends HyperHTMLElement
 
   // by default, render is a no-op
   render() {}
+
+  // usually a template would contain a main element such
+  // input, button, div, section, etc.
+  // having a simple way to retrieve such element can be
+  // both semantic and handy, as opposite of using
+  // this.children[0] each time
+  get child()
+  {
+    let element = this.firstElementChild;
+    // if accessed too early, will render automatically
+    if (!element)
+    {
+      this.render();
+      element = this.firstElementChild;
+    }
+    return element;
+  }
 }
 
 // whenever an interpolation with ${{i18n: 'string-id'}} is found
@@ -80,6 +177,8 @@ module.exports = IOElement;
 
 "use strict";
 
+const DELAY = 200;
+
 const IOElement = require("./io-element");
 
 // used to create options
@@ -87,20 +186,18 @@ const {wire} = IOElement;
 
 // used to map codes cross browser
 const KeyCode = {
-  BACKSPACE: 8,
-  TAB: 9,
-  RETURN: 13,
-  ESC: 27,
-  SPACE: 32,
-  PAGE_UP: 33,
-  PAGE_DOWN: 34,
-  END: 35,
-  HOME: 36,
-  LEFT: 37,
-  UP: 38,
-  RIGHT: 39,
-  DOWN: 40,
-  DELETE: 46
+  ARROW_DOWN: "ArrowDown",
+  ARROW_UP: "ArrowUp",
+  BACKSPACE: "Backspace",
+  DELETE: "Delete",
+  ENTER: "Enter",
+  ESCAPE: "Escape",
+  END: "End",
+  HOME: "Home",
+  PAGE_DOWN: "PageDown",
+  PAGE_UP: "PageUp",
+  SPACE: " ",
+  TAB: "Tab"
 };
 
 class IOListBox extends IOElement
@@ -115,7 +212,7 @@ class IOListBox extends IOElement
     this._blurTimer = 0;
     this._bootstrap = true;
     this._selected = {};
-    this._text = this.textContent.trim();
+    this._text = browser.i18n.getMessage("options_language_add");
     // in case the component has been addressed and
     // it has already an attached items property
     if (this.hasOwnProperty("items"))
@@ -124,6 +221,13 @@ class IOListBox extends IOElement
       delete this.items;
       this.items = items;
     }
+  }
+
+  // can be overridden but by default
+  // it returns the item.originalTitle
+  getItemTitle(item)
+  {
+    return item.originalTitle;
   }
 
   // shortcuts to retrieve sub elements
@@ -145,7 +249,7 @@ class IOListBox extends IOElement
 
   set disabled(value)
   {
-    booleanAttribute.call(this, "disabled", value);
+    IOElement.utils.boolean.attribute(this, "disabled", value);
     this.render();
   }
 
@@ -156,8 +260,18 @@ class IOListBox extends IOElement
 
   set expanded(value)
   {
-    booleanAttribute.call(this, "expanded", value);
+    IOElement.utils.boolean.attribute(this, "expanded", value);
     this.render();
+    setTimeout(
+      () =>
+      {
+        // be sure the eleemnt is blurred to re-open on focus
+        if (!value)
+          this.ownerDocument.activeElement.blur();
+        this.dispatchEvent(new CustomEvent(value ? "open" : "close"));
+      },
+      DELAY + 1
+    );
   }
 
   // items handler
@@ -170,8 +284,13 @@ class IOListBox extends IOElement
   {
     this._items = items;
     this.render();
-    // if no itmes were passed, clean up
-    // and bootstrap the next time
+    // WAI-ARIA guidelines:
+    //  If an option is selected before the listbox receives focus,
+    //  focus is set on the selected option.
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // if no items were passed, clean up
+    // and bootstrap the next time.
+    // The bootstrap will focus the right item.
     if (!items.length)
     {
       this._bootstrap = true;
@@ -186,12 +305,21 @@ class IOListBox extends IOElement
         if (this._selected[getID(item)])
         {
           // simulate hover it and exit
-          hover.call(this, item);
+          hover.call(this, "items", item);
           return;
         }
       }
       // if no item was selected, hover the first one
-      hover.call(this, items[0]);
+      hover.call(this, "items", items[0]);
+    }
+
+    // ensure the list of items reflect the meant style
+    if (!this._fixedSize)
+    {
+      this._fixedSize = true;
+      const button = this.querySelector("button");
+      this.style.setProperty("--width", button.offsetWidth + "px");
+      this.style.setProperty("--height", button.offsetHeight + "px");
     }
   }
 
@@ -207,7 +335,13 @@ class IOListBox extends IOElement
   // label related events
   onblur(event)
   {
-    this._blurTimer = setTimeout(() => this.expanded = false, 400);
+    // ensure blur won't close the list right away or it's impossible
+    // to get the selected raw on click (bad target)
+    if (this.expanded)
+      this._blurTimer = setTimeout(() =>
+      {
+        this.expanded = false;
+      }, DELAY);
   }
 
   onfocus(event)
@@ -220,37 +354,39 @@ class IOListBox extends IOElement
 
   onkeydown(event)
   {
-    event.preventDefault();
     const hovered = this.querySelector(".hover");
-    const key = event.which || event.keyCode;
-    switch (key)
+    switch (event.key)
     {
       case KeyCode.BACKSPACE:
       case KeyCode.DELETE:
+        event.preventDefault();
         break;
       /* both SPACE, RETURN and ESC hide and blur */
-      case KeyCode.RETURN:
+      case KeyCode.ENTER:
       case KeyCode.SPACE:
         hovered.dispatchEvent(new CustomEvent("click", {bubbles: true}));
         /* eslint: fall through */
-      case KeyCode.ESC:
+      case KeyCode.ESCAPE:
+        event.preventDefault();
         this.expanded = false;
         break;
-      case KeyCode.UP:
+      case KeyCode.ARROW_UP:
         const prev = findNext.call(
           this,
-          hovered, "previousElementSibling", "lastElementChild"
+          hovered, "previousElementSibling"
         );
         if (prev)
-          hover.call(this, getItem.call(this, prev.id));
+          hover.call(this, "key", getItem.call(this, prev.id));
+        event.preventDefault();
         break;
-      case KeyCode.DOWN:
+      case KeyCode.ARROW_DOWN:
         const next = findNext.call(
           this,
-          hovered, "nextElementSibling", "firstElementChild"
+          hovered, "nextElementSibling"
         );
         if (next)
-          hover.call(this, getItem.call(this, next.id));
+          hover.call(this, "key", getItem.call(this, next.id));
+        event.preventDefault();
         break;
     }
   }
@@ -258,19 +394,35 @@ class IOListBox extends IOElement
   // popup related events
   onclick(event)
   {
+    if (!IOElement.utils.event.isLeftClick(event))
+      return;
     event.preventDefault();
     clearTimeout(this._blurTimer);
-    const query = '[role="option"]:not([aria-disabled="true"])';
-    const el = event.target.closest(query);
-    this.expanded = false;
-    this.label.blur();
+    const el = event.target.closest('[role="option"]');
     if (el)
     {
-      this._selected[el.id] = !this._selected[el.id];
+      if (this.selectOnly)
+      {
+        this.expanded = false;
+        // change only if the option wasn't disabled
+        if (el.getAttribute("aria-disabled") !== "true")
+        {
+          // do not set the item selected if preventDefault happens
+          if (this.dispatchEvent(new CustomEvent("change", {
+            detail: getItem.call(this, el.id)
+          })))
+            this._selected[el.id] = !this._selected[el.id];
+        }
+      }
       this.render();
-      this.dispatchEvent(new CustomEvent("change", {
-        detail: getItem.call(this, el.id)
-      }));
+    }
+  }
+
+  onmousedown(event)
+  {
+    if (this.expanded)
+    {
+      this.expanded = false;
     }
   }
 
@@ -278,7 +430,8 @@ class IOListBox extends IOElement
   {
     const el = event.target.closest('[role="option"]');
     if (el && !el.classList.contains("hover"))
-      hover.call(this, this._items.find(item => getID(item) === el.id));
+      hover.call(this, "mouse",
+                  this._items.find(item => getID(item) === el.id));
   }
 
   // the view
@@ -295,7 +448,8 @@ class IOListBox extends IOElement
       aria-disabled="${this.disabled}"
       aria-expanded="${this.expanded}"
       aria-haspopup="${this.id + "popup"}"
-      onblur="${this}" onfocus="${this}" onkeydown="${this}"
+      onblur="${this}" onfocus="${this}"
+      onkeydown="${this}" onmousedown="${this}"
     >${this.expanded ? this.placeholder : this._text}</button>
     <ul
       role="listbox"
@@ -317,41 +471,20 @@ class IOListBox extends IOElement
         role="option"
         aria-disabled="${!item.disabled}"
         aria-selected="${this._selected[id]}"
-      >${item.value}</li>`;
+      >${this.getItemTitle(item)}</li>`;
     })}</ul>`;
   }
 }
 
 IOListBox.define("io-list-box");
 
-function asBoolean(value)
-{
-  return typeof value === "string" ? JSON.parse(value) : !!value;
-}
-
-function booleanAttribute(name, value)
-{
-  if (asBoolean(value))
-  {
-    this.setAttribute(name, "true");
-  }
-  else
-  {
-    this.removeAttribute(name);
-  }
-}
-
-// To retrieve an item from a DOM id
-// this._items.find(byID, id);
-function byID(item)
-{
-  return getID(item) == this;
-}
-
 // to retrieve a unique ID per item
 function getID(item)
 {
-  return `li-${item.url.replace(/\W/g, "-")}`;
+  // get a unique URL for each known item
+  return `li-${item.url.split("").map(
+    c => c.charCodeAt(0).toString(32)
+  ).join("")}`;
 }
 
 // to retrieve an item from an option id
@@ -361,7 +494,7 @@ function getItem(id)
 }
 
 // private helper
-function hover(item)
+function hover(type, item)
 {
   const id = getID(item);
   const hovered = this.querySelector(".hover");
@@ -371,7 +504,8 @@ function hover(item)
   option.classList.add("hover");
   this.label.setAttribute("aria-activedescendant", id);
   const popup = this.popup;
-  if (popup.scrollHeight > popup.clientHeight)
+  // if it's the mouse moving, don't auto scroll (annoying)
+  if (type !== "mouse" && popup.scrollHeight > popup.clientHeight)
   {
     const scrollBottom = popup.clientHeight + popup.scrollTop;
     const elementBottom = option.offsetTop + option.offsetHeight;
@@ -387,38 +521,33 @@ function hover(item)
 }
 
 // find next available hoverable node
-function findNext(el, other, fallback)
+function findNext(el, other)
 {
   const first = el;
   do
   {
-    el = el[other] || el.parentNode[fallback];
-  } while (el !== first && !getItem.call(this, el.id).disabled);
+    el = el[other];
+  } while (el && el !== first && !getItem.call(this, el.id).disabled);
   return el === first ? null : el;
 }
 
 },{"./io-element":1}],3:[function(require,module,exports){
 /*!
+ISC License
 
-Copyright (C) 2014-2016 by Andrea Giammarchi - @WebReflection
+Copyright (c) 2014-2018, Andrea Giammarchi, @WebReflection
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
 
 */
 // global window Object
@@ -1052,6 +1181,7 @@ function installCustomElements(window, polyfill) {'use strict';
   
     // replaced later on
     createElement = document.createElement,
+    importNode = document.importNode,
     patchedCreateElement = createElement,
   
     // shared observer for all attributes
@@ -1096,8 +1226,41 @@ function installCustomElements(window, polyfill) {'use strict';
     // will check proto or the expando attribute
     // in order to setup the node once
     patchIfNotAlready,
-    patch
+    patch,
+  
+    // used for tests
+    tmp
   ;
+  
+  // IE11 disconnectedCallback issue #
+  // to be tested before any createElement patch
+  if (MutationObserver) {
+    // original fix:
+    // https://github.com/javan/mutation-observer-inner-html-shim
+    tmp = document.createElement('div');
+    tmp.innerHTML = '<div><div></div></div>';
+    new MutationObserver(function (mutations, observer) {
+      if (
+        mutations[0] &&
+        mutations[0].type == 'childList' &&
+        !mutations[0].removedNodes[0].childNodes.length
+      ) {
+        tmp = gOPD(HTMLElementPrototype, 'innerHTML');
+        var set = tmp && tmp.set;
+        if (set)
+          defineProperty(HTMLElementPrototype, 'innerHTML', {
+            set: function (value) {
+              while (this.lastChild)
+                this.removeChild(this.lastChild);
+              set.call(this, value);
+            }
+          });
+      }
+      observer.disconnect();
+      tmp = null;
+    }).observe(tmp, {childList: true, subtree: true});
+    tmp.innerHTML = "";
+  }
   
   // only if needed
   if (!V0) {
@@ -1350,14 +1513,26 @@ function installCustomElements(window, polyfill) {'use strict';
         document[ADD_EVENT_LISTENER](DOM_CONTENT_LOADED, onReadyStateChange);
         document[ADD_EVENT_LISTENER]('readystatechange', onReadyStateChange);
   
+        document.importNode = function (node, deep) {
+          switch (node.nodeType) {
+            case 1:
+              return setupAll(document, importNode, [node, !!deep]);
+            case 11:
+              for (var
+                fragment = document.createDocumentFragment(),
+                childNodes = node.childNodes,
+                length = childNodes.length,
+                i = 0; i < length; i++
+              )
+                fragment.appendChild(document.importNode(childNodes[i], !!deep));
+              return fragment;
+            default:
+              return cloneNode.call(node, !!deep);
+          }
+        };
+  
         HTMLElementPrototype.cloneNode = function (deep) {
-          var
-            node = cloneNode.call(this, !!deep),
-            i = getTypeIndex(node)
-          ;
-          if (-1 < i) patch(node, protos[i]);
-          if (deep && query.length) loopAndSetup(node.querySelectorAll(query));
-          return node;
+          return setupAll(this, cloneNode, [!!deep]);
         };
       }
   
@@ -1550,6 +1725,17 @@ function installCustomElements(window, polyfill) {'use strict';
     onSubtreeModified.call(self, {target: self});
   }
   
+  function setupAll(context, callback, args) {
+    var
+      node = callback.apply(context, args),
+      i = getTypeIndex(node)
+    ;
+    if (-1 < i) patch(node, protos[i]);
+    if (args.pop() && query.length)
+      loopAndSetup(node.querySelectorAll(query));
+    return node;
+  }
+  
   function setupNode(node, proto) {
     setPrototype(node, proto);
     if (observer) {
@@ -1684,8 +1870,10 @@ function installCustomElements(window, polyfill) {'use strict';
     });
     safeProperty(proto, ATTRIBUTE_CHANGED_CALLBACK, {
       value: function (name) {
-        if (-1 < indexOf.call(attributes, name))
-          CProto[ATTRIBUTE_CHANGED_CALLBACK].apply(this, arguments);
+        if (-1 < indexOf.call(attributes, name)) {
+          if (CProto[ATTRIBUTE_CHANGED_CALLBACK])
+            CProto[ATTRIBUTE_CHANGED_CALLBACK].apply(this, arguments);
+        }
       }
     });
     if (CProto[CONNECTED_CALLBACK]) {
@@ -1811,13 +1999,14 @@ function installCustomElements(window, polyfill) {'use strict';
     // if available test extends work as expected
     try {
       (function (DRE, options, name) {
+        var re = new RegExp('^<a\\s+is=(\'|")' + name + '\\1></a>$');
         options[EXTENDS] = 'a';
         DRE.prototype = create(HTMLAnchorElement.prototype);
         DRE.prototype.constructor = DRE;
         window.customElements.define(name, DRE, options);
         if (
-          getAttribute.call(document.createElement('a', {is: name}), 'is') !== name ||
-          (usableCustomElements && getAttribute.call(new DRE(), 'is') !== name)
+          !re.test(document.createElement('a', {is: name}).outerHTML) ||
+          !re.test((new DRE()).outerHTML)
         ) {
           throw options;
         }
@@ -1852,20 +2041,30 @@ module.exports = installCustomElements;
 
 },{}],4:[function(require,module,exports){
 'use strict';
-/*! (C) 2017 Andrea Giammarchi - ISC Style License */
+/*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
 const {Component, bind, define, hyper, wire} = require('hyperhtml/cjs');
 
-const _init$ = {value: false};
-
-const defineProperty = Object.defineProperty;
+// utils to deal with custom elements builtin extends
+const O = Object;
+const classes = [];
+const defineProperties = O.defineProperties;
+const defineProperty = O.defineProperty;
+const getOwnPropertyDescriptor = O.getOwnPropertyDescriptor;
+const getOwnPropertyNames = O.getOwnPropertyNames;
+const getOwnPropertySymbols = O.getOwnPropertySymbols || (() => []);
+const getPrototypeOf = O.getPrototypeOf || (o => o.__proto__);
+const ownKeys = typeof Reflect === 'object' && Reflect.ownKeys ||
+                (o => getOwnPropertyNames(o).concat(getOwnPropertySymbols(o)));
+const setPrototypeOf = O.setPrototypeOf ||
+                      ((o, p) => (o.__proto__ = p, o));
 
 class HyperHTMLElement extends HTMLElement {
 
   // define a custom-element in the CustomElementsRegistry
   // class MyEl extends HyperHTMLElement {}
   // MyEl.define('my-el');
-  static define(name) {
+  static define(name, options) {
     const Class = this;
     const proto = Class.prototype;
 
@@ -1891,11 +2090,11 @@ class HyperHTMLElement extends HTMLElement {
     const onChanged = proto.attributeChangedCallback;
     const hasChange = !!onChanged;
 
-    // created() {} is the entry point to do whatever you want.
-    // Once the node is live and upgraded as Custom Element.
-    // This method grants to be triggered at the right time,
-    // which is always once, and right before either
-    // attributeChangedCallback or connectedCallback
+    // created() {} is an initializer method that grants
+    // the node is fully known to the browser.
+    // It is ensured to run either after DOMContentLoaded,
+    // or once there is a next sibling (stream-friendly) so that
+    // you have full access to element attributes and/or childNodes.
     const created = proto.created;
     if (created) {
       // used to ensure create() is called once and once only
@@ -1917,9 +2116,11 @@ class HyperHTMLElement extends HTMLElement {
         'attributeChangedCallback',
         {
           configurable: true,
-          value(name, prev, curr) {
+          value: function aCC(name, prev, curr) {
             if (this._init$) {
-              created.call(defineProperty(this, '_init$', _init$));
+              checkReady.call(this, created);
+              if (this._init$)
+                return this._init$$.push(aCC.bind(this, name, prev, curr));
             }
             // ensure setting same value twice
             // won't trigger twice attributeChangedCallback
@@ -1940,9 +2141,11 @@ class HyperHTMLElement extends HTMLElement {
         'connectedCallback',
         {
           configurable: true,
-          value() {
+          value: function cC() {
             if (this._init$) {
-              created.call(defineProperty(this, '_init$', _init$));
+              checkReady.call(this, created);
+              if (this._init$)
+                return this._init$$.push(cC.bind(this));
             }
             if (hasConnect) {
               onConnected.apply(this, arguments);
@@ -1973,7 +2176,7 @@ class HyperHTMLElement extends HTMLElement {
     // define lazily all handlers
     // class { handleClick() { ... }
     // render() { `<a onclick=${this.handleClick}>` } }
-    Object.getOwnPropertyNames(proto).forEach(key => {
+    getOwnPropertyNames(proto).forEach(key => {
       if (/^handle[A-Z]/.test(key)) {
         const _key$ = '_' + key + '$';
         const method = proto[key];
@@ -2013,7 +2216,34 @@ class HyperHTMLElement extends HTMLElement {
       );
     }
 
-    customElements.define(name, Class);
+    if (options && options.extends) {
+      const Native = document.createElement(options.extends).constructor;
+      const Intermediate = class extends Native {};
+      const Super = getPrototypeOf(Class);
+      ownKeys(Super)
+        .filter(key => [
+          'length', 'name', 'arguments', 'caller', 'prototype'
+        ].indexOf(key) < 0)
+        .forEach(key => defineProperty(
+          Intermediate,
+          key,
+          getOwnPropertyDescriptor(Super, key)
+        )
+      );
+      ownKeys(Super.prototype)
+        .forEach(key => defineProperty(
+          Intermediate.prototype,
+          key,
+          getOwnPropertyDescriptor(Super.prototype, key)
+        )
+      );
+      setPrototypeOf(Class, Intermediate);
+      setPrototypeOf(proto, Intermediate.prototype);
+      customElements.define(name, Class, options);
+    } else {
+      customElements.define(name, Class);
+    }
+    classes.push(Class);
     return Class;
   }
 
@@ -2081,11 +2311,76 @@ HyperHTMLElement.intent = define;
 HyperHTMLElement.wire = wire;
 HyperHTMLElement.hyper = hyper;
 
+try {
+  if (Symbol.hasInstance) classes.push(
+    defineProperty(HyperHTMLElement, Symbol.hasInstance, {
+      enumerable: false,
+      configurable: true,
+      value(instance) {
+        return classes.some(isPrototypeOf, getPrototypeOf(instance));
+      }
+    }));
+} catch(meh) {}
+
 Object.defineProperty(exports, '__esModule', {value: true}).default = HyperHTMLElement;
+
+// ------------------------------//
+// DOMContentLoaded VS created() //
+// ------------------------------//
+const dom = {
+  type: 'DOMContentLoaded',
+  handleEvent() {
+    if (dom.ready()) {
+      document.removeEventListener(dom.type, dom, false);
+      dom.list.splice(0).forEach(invoke);
+    }
+    else
+      setTimeout(dom.handleEvent);
+  },
+  ready() {
+    return document.readyState === 'complete';
+  },
+  list: []
+};
+
+if (!dom.ready()) {
+  document.addEventListener(dom.type, dom, false);
+}
+
+function checkReady(created) {
+  if (dom.ready() || isReady.call(this, created)) {
+    if (this._init$) {
+      const list = this._init$$;
+      if (list) delete this._init$$;
+      created.call(defineProperty(this, '_init$', {value: false}));
+      if (list) list.forEach(invoke);
+    }
+  } else {
+    if (!this.hasOwnProperty('_init$$'))
+      defineProperty(this, '_init$$', {configurable: true, value: []});
+    dom.list.push(checkReady.bind(this, created));
+  }
+}
+
+function invoke(fn) {
+  fn();
+}
+
+function isPrototypeOf(Class) {
+  return this === Class.prototype;
+}
+
+function isReady(created) {
+  let el = this;
+  do { if (el.nextSibling) return true; }
+  while (el = el.parentNode);
+  setTimeout(checkReady.bind(this, created));
+  return false;
+}
 
 },{"hyperhtml/cjs":9}],5:[function(require,module,exports){
 'use strict';
-const { WeakMap } = require('../shared/poorlyfills.js');
+const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
 // hyperHTML.Component is a very basic class
 // able to create Custom Elements like components
@@ -2112,18 +2407,24 @@ function setup(content) {
     return component;
   };
   const get = (Class, info, context, id) => {
+    const relation = info.get(Class) || relate(Class, info);
     switch (typeof id) {
       case 'object':
       case 'function':
-        const wm = info.w || (info.w = new WeakMap);
+        const wm = relation.w || (relation.w = new WeakMap);
         return wm.get(id) || createEntry(wm, id, new Class(context));
       default:
-        const sm = info.p || (info.p = create(null));
+        const sm = relation.p || (relation.p = create(null));
         return sm[id] || (sm[id] = new Class(context));
     }
   };
+  const relate = (Class, info) => {
+    const relation = {w: null, p: null};
+    info.set(Class, relation);
+    return relation;
+  };
   const set = context => {
-    const info = {w: null, p: null};
+    const info = new Map;
     children.set(context, info);
     return info;
   };
@@ -2138,8 +2439,13 @@ function setup(content) {
       for: {
         configurable: true,
         value(context, id) {
-          const info = children.get(context) || set(context);
-          return get(this, info, context, id == null ? 'default' : id);
+          return get(
+            this,
+            children.get(context) || set(context),
+            context,
+            id == null ?
+              'default' : id
+          );
         }
       }
     }
@@ -2236,12 +2542,13 @@ Wire.prototype.remove = function remove() {
 },{"../shared/easy-dom.js":16,"../shared/utils.js":20}],7:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
-const {UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
+const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
 const Updates = (m => m.__esModule ? m.default : m)(require('../objects/Updates.js'));
 const {
   createFragment,
   importNode,
-  unique
+  unique,
+  TemplateMap
 } = require('../shared/utils.js');
 
 const {selfClosing} = require('../shared/re.js');
@@ -2250,10 +2557,8 @@ const {selfClosing} = require('../shared/re.js');
 // are already known to hyperHTML
 const bewitched = new WeakMap;
 
-// the collection of all template literals
-// since these are unique and immutable
-// for the whole application life-cycle
-const templates = new Map;
+// all unique template literals
+const templates = TemplateMap();
 
 // better known as hyper.bind(node), the render is
 // the main tag function in charge of fully upgrading
@@ -2661,7 +2966,7 @@ const domdiff = (m => m.__esModule ? m.default : m)(require('../shared/domdiff.j
 // import { create as createElement, text } from '../shared/easy-dom.js';
 const { text } = require('../shared/easy-dom.js');
 const { Event, WeakSet, isArray, trim } = require('../shared/poorlyfills.js');
-const { createFragment, slice } = require('../shared/utils.js');
+const { createFragment, getChildren, slice } = require('../shared/utils.js');
 
 // hyper.Component have a connected/disconnected
 // mechanism provided by MutationObserver
@@ -2872,6 +3177,7 @@ const isPromise_ish = value => value != null && 'then' in value;
 //  * it's an Array, resolve all values if Promises and/or
 //    update the node with the resulting list of content
 const setAnyContent = (node, childNodes) => {
+  const diffOptions = {node: asNode, before: node};
   let fastPath = false;
   let oldValue;
   const anyContent = value => {
@@ -2891,8 +3197,7 @@ const setAnyContent = (node, childNodes) => {
             node.parentNode,
             childNodes,
             [text(node, value)],
-            asNode,
-            node
+            diffOptions
           );
         }
         break;
@@ -2904,8 +3209,7 @@ const setAnyContent = (node, childNodes) => {
             node.parentNode,
             childNodes,
             [],
-            asNode,
-            node
+            diffOptions
           );
           break;
         }
@@ -2919,8 +3223,7 @@ const setAnyContent = (node, childNodes) => {
                 node.parentNode,
                 childNodes,
                 [],
-                asNode,
-                node
+                diffOptions
               );
             }
           } else {
@@ -2943,8 +3246,7 @@ const setAnyContent = (node, childNodes) => {
                   node.parentNode,
                   childNodes,
                   value,
-                  asNode,
-                  node
+                  diffOptions
                 );
                 break;
             }
@@ -2956,8 +3258,7 @@ const setAnyContent = (node, childNodes) => {
             value.nodeType === DOCUMENT_FRAGMENT_NODE ?
               slice.call(value.childNodes) :
               [value],
-            asNode,
-            node
+            diffOptions
           );
         } else if (isPromise_ish(value)) {
           value.then(anyContent);
@@ -2977,8 +3278,7 @@ const setAnyContent = (node, childNodes) => {
                 [].concat(value.html).join('')
               ).childNodes
             ),
-            asNode,
-            node
+            diffOptions
           );
         } else if ('length' in value) {
           anyContent(slice.call(value));
@@ -3138,7 +3438,8 @@ function observe() {
       node.dispatchEvent(event);
     }
 
-    const children = node.children;
+    /* istanbul ignore next */
+    const children = node.children || getChildren(node);
     const length = children.length;
     for (let i = 0; i < length; i++) {
       dispatchTarget(children[i], event);
@@ -3223,24 +3524,35 @@ exports.UIDC = UIDC;
  * @credits https://github.com/snabbdom/snabbdom
  */
 
+const eqeq = (a, b) => a == b;
+
 const identity = O => O;
 
-const remove = (parentNode, before, after) => {
-  const range = parentNode.ownerDocument.createRange();
-  range.setStartBefore(before);
-  range.setEndAfter(after);
-  range.deleteContents();
+const remove = (get, parentNode, before, after) => {
+  if (after == null) {
+    parentNode.removeChild(get(before, -1));
+  } else {
+    const range = parentNode.ownerDocument.createRange();
+    range.setStartBefore(get(before, -1));
+    range.setEndAfter(get(after, -1));
+    range.deleteContents();
+  }
 };
 
 const domdiff = (
   parentNode,     // where changes happen
   currentNodes,   // Array of current items/nodes
   futureNodes,    // Array of future items/nodes
-  getNode,        // optional way to retrieve a node from an item
-  beforeNode      // optional item/node to use as insertBefore delimiter
+  options         // optional object with one of the following properties
+                  //  before: domNode
+                  //  compare(generic, generic) => true if same generic
+                  //  node(generic) => Node
 ) => {
-  const get = getNode || identity;
-  const before = beforeNode == null ? null : get(beforeNode, 0);
+  if (!options)
+    options = {};
+  const compare = options.compare || eqeq;
+  const get = options.node || identity;
+  const before = options.before == null ? null : get(options.before, 0);
   let currentStart = 0, futureStart = 0;
   let currentEnd = currentNodes.length - 1;
   let currentStartNode = currentNodes[0];
@@ -3261,15 +3573,15 @@ const domdiff = (
     else if (futureEndNode == null) {
       futureEndNode = futureNodes[--futureEnd];
     }
-    else if (currentStartNode == futureStartNode) {
+    else if (compare(currentStartNode, futureStartNode)) {
       currentStartNode = currentNodes[++currentStart];
       futureStartNode = futureNodes[++futureStart];
     }
-    else if (currentEndNode == futureEndNode) {
+    else if (compare(currentEndNode, futureEndNode)) {
       currentEndNode = currentNodes[--currentEnd];
       futureEndNode = futureNodes[--futureEnd];
     }
-    else if (currentStartNode == futureEndNode) {
+    else if (compare(currentStartNode, futureEndNode)) {
       parentNode.insertBefore(
         get(currentStartNode, 1),
         get(currentEndNode, -0).nextSibling
@@ -3277,7 +3589,7 @@ const domdiff = (
       currentStartNode = currentNodes[++currentStart];
       futureEndNode = futureNodes[--futureEnd];
     }
-    else if (currentEndNode == futureStartNode) {
+    else if (compare(currentEndNode, futureStartNode)) {
       parentNode.insertBefore(
         get(currentEndNode, 1),
         get(currentStartNode, 0)
@@ -3310,9 +3622,10 @@ const domdiff = (
             parentNode.removeChild(get(currentStartNode, -1));
           } else {
             remove(
+              get,
               parentNode,
-              get(currentStartNode, -1),
-              get(currentNodes[index], -1)
+              currentStartNode,
+              currentNodes[index]
             );
           }
           currentStart = i;
@@ -3344,15 +3657,17 @@ const domdiff = (
       }
     }
     else {
-      if (currentNodes[currentStart] == null) currentStart++;
+      if (currentNodes[currentStart] == null)
+        currentStart++;
       if (currentStart === currentEnd) {
         parentNode.removeChild(get(currentNodes[currentStart], -1));
       }
       else {
         remove(
+          get,
           parentNode,
-          get(currentNodes[currentStart], -1),
-          get(currentNodes[currentEnd], -1)
+          currentNodes[currentStart],
+          currentNodes[currentEnd]
         );
       }
     }
@@ -3424,6 +3739,7 @@ try {
 exports.Event = Event;
 
 // used to store template literals
+/* istanbul ignore next */
 const Map = G.Map || function Map() {
   const keys = [], values = [];
   return {
@@ -3438,11 +3754,13 @@ const Map = G.Map || function Map() {
 exports.Map = Map;
 
 // used to store wired content
+let ID = 0;
 const WeakMap = G.WeakMap || function WeakMap() {
+  const key = UID + ID++;
   return {
-    get(obj) { return obj[UID]; },
+    get(obj) { return obj[key]; },
     set(obj, value) {
-      Object.defineProperty(obj, UID, {
+      Object.defineProperty(obj, key, {
         configurable: true,
         value
       });
@@ -3503,6 +3821,7 @@ const {attrName, attrSeeker} = require('./re.js');
 
 const {
   G,
+  ELEMENT_NODE,
   OWNER_SVG_ELEMENT,
   SVG_NAMESPACE,
   UID,
@@ -3517,6 +3836,8 @@ const {
 } = require('./features-detection.js');
 
 const {create, doc, fragment} = require('./easy-dom.js');
+
+const {Map, WeakMap} = require('./poorlyfills.js');
 
 // appends an array of nodes
 // to a generic node/fragment
@@ -3580,6 +3901,20 @@ const cloneNode = hasDoomedCloneNode ?
   /* istanbul ignore next */
   node => node.cloneNode(true);
 
+// IE and Edge do not support children in SVG nodes
+/* istanbul ignore next */
+const getChildren = node => {
+  const children = [];
+  const childNodes = node.childNodes;
+  const length = childNodes.length;
+  for (let i = 0; i < length; i++) {
+    if (childNodes[i].nodeType === ELEMENT_NODE)
+      children.push(childNodes[i]);
+  }
+  return children;
+};
+exports.getChildren = getChildren;
+
 // used to import html into fragments
 const importNode = hasImportNode ?
   (doc, node) => doc.importNode(node, true) :
@@ -3606,32 +3941,45 @@ exports.unique = unique;
 // TL returns a unique version of the template
 // it needs lazy feature detection
 // (cannot trust literals with transpiled code)
-let TL = template => {
+let TL = t => {
   if (
     // TypeScript template literals are not standard
-    template.propertyIsEnumerable('raw') ||
+    t.propertyIsEnumerable('raw') ||
     (
-      // Firefox < 55 has not standard implementation neither
-      /Firefox\/(\d+)/.test((G.navigator || {}).userAgent) &&
-      parseFloat(RegExp.$1) < 55
-    )
+        // Firefox < 55 has not standard implementation neither
+        /Firefox\/(\d+)/.test((G.navigator || {}).userAgent) &&
+          parseFloat(RegExp.$1) < 55
+        )
   ) {
-    // in these cases, address templates once
-    const templateObjects = {};
-    // but always return the same template
-    TL = template => {
-      const key = '_' + template.join(UID);
-      return templateObjects[key] || (
-        templateObjects[key] = template
-      );
+    const T = {};
+    TL = t => {
+      const k = '^' + t.join('^');
+      return T[k] || (T[k] = t);
     };
-  }
-  else {
+  } else {
     // make TL an identity like function
-    TL = template => template;
+    TL = t => t;
   }
-  return TL(template);
+  return TL(t);
 };
+
+// used to store templates objects
+// since neither Map nor WeakMap are safe
+const TemplateMap = () => {
+  try {
+    const wm = new WeakMap;
+    const o_O = Object.freeze([]);
+    wm.set(o_O, true);
+    if (!wm.get(o_O))
+      throw o_O;
+    return wm;
+  } catch(o_O) {
+    // inevitable legacy code leaks due
+    // https://github.com/tc39/ecma262/pull/890
+    return new Map;
+  }
+};
+exports.TemplateMap = TemplateMap;
 
 // create document fragments via native template
 // with a fallback for browsers that won't be able
@@ -3674,9 +4022,7 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":14,"./easy-dom.js":16,"./features-detection.js":17,"./re.js":19}],21:[function(require,module,exports){
-/* globals require */
-
+},{"./constants.js":14,"./easy-dom.js":16,"./features-detection.js":17,"./poorlyfills.js":18,"./re.js":19}],21:[function(require,module,exports){
 "use strict";
 
 require("../js/io-list-box");

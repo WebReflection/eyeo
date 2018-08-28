@@ -15,12 +15,14 @@
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
 io-highlighter,
+io-highlighter *,
 io-highlighter *::before,
 io-highlighter *::after {
   box-sizing: border-box; }
 
 io-highlighter {
   display: block;
+  position: relative;
   border: 1px solid #979797; }
 
 io-highlighter .split {
@@ -28,75 +30,66 @@ io-highlighter .split {
   height: 100%; }
 
 io-highlighter .options {
+  width: 95px;
   padding: 12px;
+  border-right: 1px solid #979797;
   color: #4A4A4A;
-  background-color: #f1f1f1;
-  border-right: 1px solid #979797; }
-
-io-highlighter .options .active {
-  color: #FFF;
-  background-color: #9b9b9b; }
+  background-color: #f1f1f1; }
 
 io-highlighter canvas {
-  flex-grow: 1;
-  user-select: none;
-  touch-action: none;
-  pointer-events: none;
   width: 100%;
-  height: 100%; }
+  height: 100%;
+  user-select: none;
+  pointer-events: none;
+  flex-grow: 1;
+  touch-action: none; }
 
-io-highlighter canvas.active {
+io-highlighter[drawing] canvas {
   pointer-events: all; }
 
 io-highlighter .options .highlight {
   background-image: url(icons/highlight.svg?off#off); }
 
-io-highlighter .options .highlight.active {
+io-highlighter[drawing="highlight"] .options .highlight {
   background-image: url(icons/highlight.svg?on#on); }
 
 io-highlighter .options .hide {
   background-image: url(icons/hide.svg?off#off); }
 
-io-highlighter .options .hide.active {
+io-highlighter[drawing="hide"] .options .hide {
   background-image: url(icons/hide.svg?on#on); }
 
 io-highlighter .options .highlight,
 io-highlighter .options .hide {
   width: 70px;
-  height: 70px;
+  min-height: 70px;
+  margin-bottom: 12px;
   padding: 0;
   padding-top: 40px;
-  margin-bottom: 12px;
-  font-size: 0.7rem;
   border-width: 0;
   border-radius: 12px;
   outline: none;
+  color: inherit;
+  background-repeat: no-repeat;
   background-position: center 12px;
-  background-repeat: no-repeat; }
+  font-size: 0.7rem;
+  word-break: break-all; }
+
+io-highlighter[drawing="highlight"] .options .highlight,
+io-highlighter[drawing="hide"] .options .hide {
+  color: #FFF;
+  background-color: #9b9b9b; }
 
 io-highlighter .closer {
-  position: absolute;
   display: block;
+  position: absolute;
   width: 24px;
   height: 24px;
-  cursor: pointer;
   border-radius: 24px;
-  transform: translateX(-12px) translateY(-12px);
-  background-color: #4a4a4a; }
+  background-color: #4a4a4a;
+  cursor: pointer;
+  transform: translateX(-12px) translateY(-12px); }
 
-io-highlighter .closer::before,
-io-highlighter .closer::after {
-  position: absolute;
-  top: 6px;
-  left: 12px;
-  content: ' ';
-  display: block;
-  width: 1px;
-  height: 12px;
-  background: #fefefe; }
-
-io-highlighter .closer::before {
-  transform: rotate(45deg); }
-
-io-highlighter .closer::after {
-  transform: rotate(-45deg); }
+io-highlighter .closer img {
+  width: 12px;
+  margin: 6px; }
