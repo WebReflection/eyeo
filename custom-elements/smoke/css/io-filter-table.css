@@ -15,6 +15,58 @@
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-filter-search {
+  display: flex;
+  flex-direction: row;
+  height: 32px; }
+
+io-filter-search > input {
+  padding: 0 8px;
+  border: 1px solid #9b9b9b;
+  flex-grow: 1; }
+
+io-filter-search > button {
+  padding: 0 32px;
+  border: 0;
+  color: #fff;
+  background-color: #3a97b9;
+  text-transform: uppercase; }
+
+io-filter-search > button:disabled {
+  opacity: 0.7; }
+
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
 io-filter-list {
   position: relative;
   min-width: 500px;
@@ -152,7 +204,7 @@ io-filter-list thead[data-sort="hits"] th[data-info="hits"]::after {
 
 io-filter-list > io-scrollbar {
   position: absolute;
-  top: 30px;
+  top: 29px;
   bottom: 0; }
 
 html:not([dir="rtl"]) io-filter-list > io-scrollbar {
@@ -160,3 +212,69 @@ html:not([dir="rtl"]) io-filter-list > io-scrollbar {
 
 html[dir="rtl"] io-filter-list > io-scrollbar {
   left: 0; }
+
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-scrollbar {
+  /*
+    related to the container height, as in ░▓░░░░░░░░░░░
+    or width, in case it's a vertical scrollbar
+  */
+  --size: 12px;
+  overflow: hidden;
+  cursor: default;
+  user-select: none; }
+
+io-scrollbar,
+io-scrollbar > .slider {
+  display: block;
+  box-sizing: border-box;
+  padding: 0; }
+
+io-scrollbar > .slider {
+  margin: 0;
+  border: 1px solid #979797;
+  background-color: #d8d8d8;
+  font-size: 0;
+  line-height: 0; }
+
+io-scrollbar[direction="horizontal"] {
+  height: var(--size); }
+
+io-scrollbar[direction="vertical"] {
+  width: var(--size); }
+
+io-scrollbar[direction="horizontal"] > .slider {
+  width: var(--slider-size, var(--size));
+  height: 100%;
+  transform: translateX(var(--position, 0)); }
+
+io-scrollbar[direction="vertical"] > .slider {
+  width: 100%;
+  height: var(--slider-size, var(--size));
+  transform: translateY(var(--position, 0)); }
+
+io-filter-table {
+  display: flex;
+  flex-direction: column;
+  min-width: 500px; }
+
+io-filter-table > io-filter-list > table {
+  border-top: 0; }
+
+io-filter-table > io-filter-list > io-scrollbar {
+  margin-top: -1px; }

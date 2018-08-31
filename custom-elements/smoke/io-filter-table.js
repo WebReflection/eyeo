@@ -211,7 +211,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":5,"hyperhtml-element/cjs":6}],3:[function(require,module,exports){
+},{"document-register-element/pony":7,"hyperhtml-element/cjs":8}],3:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -360,6 +360,14 @@ class IOFilterList extends IOElement
     );
   }
 
+  scrollTo(row)
+  {
+    const {rowHeight} = this.state;
+    this.setState({
+      scrollTop: this.filters.findIndex(filter => filter === row) * rowHeight
+    });
+  }
+
   onheaderclick(event)
   {
     const th = event.target.closest("th");
@@ -426,6 +434,8 @@ class IOFilterList extends IOElement
     )
       return;
     const td = event.target.closest("td");
+    if (!td)
+      return;
     const {info} = td.dataset;
     const div = $('td[data-info="rule"] > [contenteditable]', td.parentNode);
     const {textContent} = div;
@@ -609,7 +619,320 @@ function updateScrollbar()
   });
 }
 
-},{"./dom":1,"./io-element":2,"./io-scrollbar":4}],4:[function(require,module,exports){
+},{"./dom":1,"./io-element":2,"./io-scrollbar":6}],4:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+"use strict";
+
+const IOElement = require("./io-element");
+
+const {$} = require("./dom");
+
+const {boolean} = IOElement.utils;
+
+// this component simply emits filter:add(text)
+// and filter:match({accuracy, filter}) events
+class IOFilterSearch extends IOElement
+{
+  static get observedAttributes() { return ["disabled", "filters", "match"]; }
+
+  get defaultState() { return {filterExists: true, filters: [], match: 1}; }
+
+  get disabled() { return this.hasAttribute("disabled"); }
+
+  set disabled(value)
+  {
+    boolean.attribute(this, "disabled", value);
+    this.render();
+  }
+
+  get filters() { return this.state.filters; }
+
+  // filters are never modified or copied
+  // but used to find out if one could be added
+  // or if the component in charge should show the found one
+  set filters(value) { this.setState({filters: value || []}); }
+
+  get match() { return this.state.match; }
+  set match(value)
+  {
+    // match 0, false, null, NaN makes no sense
+    // so whenever match isn't a number between 0.1
+    // and 1, it's set as "match same" automatically
+    this.setState({match: parseFloat(value) || 1}, false);
+  }
+
+  get value() { return $("input", this).value; }
+
+  set value(text)
+  {
+    $("input", this).value = text || "";
+    this.setState({
+      filterExists: text ? this.state.filters.some(hasValue, text) : false
+    });
+  }
+
+  created()
+  {
+    const {i18n} = browser;
+    this._placeholder = i18n.getMessage("options_filters_search_or_add");
+    this._timer = 0;
+    this.render();
+  }
+
+  onclick()
+  {
+    dispatch.call(this, "filter:add", this.value);
+  }
+
+  onkeydown(event)
+  {
+    switch (event.key)
+    {
+      case "Enter":
+        if (!this.state.filters.some(hasValue, this.value))
+        {
+          $("input", this).blur();
+          this.onclick();
+        }
+        break;
+      case " ":
+        event.preventDefault();
+        break;
+    }
+  }
+
+  onkeyup()
+  {
+    clearTimeout(this._timer);
+    // debounce the search to avoid degrading
+    // performance on very long list of filters
+    this._timer = setTimeout(() =>
+    {
+      this._timer = 0;
+      const {match, value} = this;
+      const searchLength = value.length;
+      if (!searchLength)
+        return;
+      const {filters} = this.state;
+      const {length} = filters;
+      let closerFilter = null;
+      let lowerDistance = searchLength;
+      for (let i = 0; i < length; i++)
+      {
+        const filter = filters[i];
+        // critical performance path
+        // no need to take coercion into account
+        if (filter.text === value)
+        {
+          closerFilter = filter;
+          lowerDistance = 0;
+          break;
+        }
+        // skip levenstein distance if match is 1
+        else if (match < 1 && searchLength <= filter.text.length)
+        {
+          const distance = levenstein(value, filter.text);
+          if (distance < lowerDistance)
+          {
+            closerFilter = filter;
+            lowerDistance = distance;
+          }
+        }
+      }
+      const filterExists = !lowerDistance;
+      this.setState({filterExists});
+      let accuracy;
+      if (filterExists)
+        accuracy = 1;
+      else if (lowerDistance === searchLength)
+        accuracy = 0;
+      else
+        accuracy = 1 - lowerDistance / searchLength;
+      if (match <= accuracy)
+        dispatch.call(this, "filter:match", {
+          accuracy,
+          filter: closerFilter
+        });
+    }, 250);
+  }
+
+  render()
+  {
+    const {disabled} = this;
+    this.html`
+    <input
+      placeholder="${this._placeholder}"
+      onkeydown="${this}" onkeyup="${this}"
+      disabled="${disabled}"
+    >
+    <button
+      onclick="${this}"
+      disabled="${disabled || this.state.filterExists || !this.value}">
+      + ${{i18n: "add"}}
+    </button>`;
+  }
+}
+
+IOFilterSearch.define("io-filter-search");
+
+module.exports = IOFilterSearch;
+
+function dispatch(type, detail)
+{
+  this.dispatchEvent(new CustomEvent(type, {detail}));
+}
+
+function hasValue(filter)
+{
+  return filter.text == this;
+}
+
+// https://github.com/WebReflection/majinbuu/blob/master/levenstein.c
+function levenstein(from, to)
+{
+  const fromLength = from.length + 1;
+  const toLength = to.length + 1;
+  const size = fromLength * toLength;
+  const grid = new Array(size);
+  let x = 0;
+  let y = 0;
+  let X = 0;
+  let Y = 0;
+  let crow = 0;
+  grid[0] = 0;
+  while (++x < toLength)
+    grid[x] = x;
+  while (++y < fromLength)
+  {
+    X = x = 0;
+    const prow = crow;
+    crow = y * toLength;
+    grid[crow + x] = y;
+    while (++x < toLength)
+    {
+      const del = grid[prow + x] + 1;
+      const ins = grid[crow + X] + 1;
+      const sub = grid[prow + X] + (from[Y] === to[X] ? 0 : 1);
+      grid[crow + x] = del < ins ?
+                        (del < sub ?
+                          del : sub) :
+                        (ins < sub ?
+                          ins : sub);
+      ++X;
+    }
+    Y = y;
+  }
+  return grid[size - 1];
+}
+
+},{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+"use strict";
+
+const IOElement = require("./io-element");
+const IOFilterList = require("./io-filter-list");
+const IOFilterSearch = require("./io-filter-search");
+
+const {boolean} = IOElement.utils;
+const log = window.console.log;
+
+// io-filter-table is a basic controller
+// used to relate the search and the list
+class IOFilterTable extends IOElement
+{
+  static get observedAttributes() { return ["disabled", "filters"]; }
+
+  get defaultState() { return {disabled: false, filters: [], ready: false}; }
+
+  created()
+  {
+    this._showing = null;
+    this.search = this.appendChild(new IOFilterSearch());
+    this.search.match = 0.9;
+    this.search.addEventListener("filter:add", log);
+    this.search.addEventListener(
+      "filter:match",
+      event => this.onFilterMatch(event)
+    );
+    this.list = this.appendChild(new IOFilterList());
+    this.setState({ready: true});
+  }
+
+  get disabled()
+  {
+    return this.hasAttribute("disabled");
+  }
+
+  set disabled(value)
+  {
+    boolean.attribute(this, "disabled", value);
+    this.setState({disabled: value});
+  }
+
+  get filters()
+  {
+    return this.state.filters;
+  }
+
+  set filters(value)
+  {
+    this.setState({filters: value});
+  }
+
+  onFilterMatch(event)
+  {
+    this.list.scrollTo(event.detail.filter);
+  }
+
+  render()
+  {
+    const {disabled, filters, ready} = this.state;
+    if (!ready)
+      return;
+    // simply update inner components
+    // no need to render any html in here
+    this.search.disabled = disabled;
+    this.search.filters = filters;
+    this.list.disabled = disabled;
+    this.list.filters = filters;
+  }
+}
+
+IOFilterTable.define("io-filter-table");
+
+},{"./io-element":2,"./io-filter-list":3,"./io-filter-search":4}],6:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -853,7 +1176,7 @@ function stop(event)
   event.stopPropagation();
 }
 
-},{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
+},{"./dom":1,"./io-element":2}],7:[function(require,module,exports){
 /*!
 ISC License
 
@@ -2361,7 +2684,7 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],6:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 'use strict';
 /*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
@@ -2741,7 +3064,7 @@ function isReady(created) {
   return false;
 }
 
-},{"hyperhtml/cjs":11}],7:[function(require,module,exports){
+},{"hyperhtml/cjs":13}],9:[function(require,module,exports){
 'use strict';
 const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
@@ -2898,7 +3221,7 @@ const setValue = (self, secret, value) =>
   })[secret]
 ;
 
-},{"../shared/poorlyfills.js":20}],8:[function(require,module,exports){
+},{"../shared/poorlyfills.js":22}],10:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -2933,7 +3256,7 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":18,"../shared/utils.js":22}],9:[function(require,module,exports){
+},{"../shared/easy-dom.js":20,"../shared/utils.js":24}],11:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
 const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
@@ -3015,7 +3338,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":15,"../shared/constants.js":16,"../shared/poorlyfills.js":20,"../shared/re.js":21,"../shared/utils.js":22}],10:[function(require,module,exports){
+},{"../objects/Updates.js":17,"../shared/constants.js":18,"../shared/poorlyfills.js":22,"../shared/re.js":23,"../shared/utils.js":24}],12:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -3115,7 +3438,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./render.js":9}],11:[function(require,module,exports){
+},{"../classes/Wire.js":10,"../shared/constants.js":18,"../shared/easy-dom.js":20,"../shared/poorlyfills.js":22,"../shared/utils.js":24,"./render.js":11}],13:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -3177,7 +3500,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./classes/Component.js":7,"./hyper/render.js":9,"./hyper/wire.js":10,"./objects/Intent.js":12,"./shared/domdiff.js":17}],12:[function(require,module,exports){
+},{"./classes/Component.js":9,"./hyper/render.js":11,"./hyper/wire.js":12,"./objects/Intent.js":14,"./shared/domdiff.js":19}],14:[function(require,module,exports){
 'use strict';
 const attributes = {};
 const intents = {};
@@ -3219,7 +3542,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],13:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -3279,7 +3602,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":16}],14:[function(require,module,exports){
+},{"../shared/constants.js":18}],16:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -3352,7 +3675,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],15:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -3876,7 +4199,7 @@ function observe() {
   }
 }
 
-},{"../classes/Component.js":7,"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/domdiff.js":17,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./Intent.js":12,"./Path.js":13,"./Style.js":14}],16:[function(require,module,exports){
+},{"../classes/Component.js":9,"../classes/Wire.js":10,"../shared/constants.js":18,"../shared/domdiff.js":19,"../shared/easy-dom.js":20,"../shared/poorlyfills.js":22,"../shared/utils.js":24,"./Intent.js":14,"./Path.js":15,"./Style.js":16}],18:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -3921,7 +4244,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],17:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 /*! (c) 2017 Andrea Giammarchi (ISC) */
@@ -4085,7 +4408,7 @@ const domdiff = (
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
 
-},{}],18:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -4097,7 +4420,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],19:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -4124,7 +4447,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":18}],20:[function(require,module,exports){
+},{"./easy-dom.js":20}],22:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -4198,7 +4521,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":16}],21:[function(require,module,exports){
+},{"./constants.js":18}],23:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -4223,7 +4546,7 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],22:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
@@ -4430,10 +4753,10 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":16,"./easy-dom.js":18,"./features-detection.js":19,"./poorlyfills.js":20,"./re.js":21}],23:[function(require,module,exports){
+},{"./constants.js":18,"./easy-dom.js":20,"./features-detection.js":21,"./poorlyfills.js":22,"./re.js":23}],25:[function(require,module,exports){
 "use strict";
 
-require("../js/io-filter-list");
+require("../js/io-filter-table");
 
 fetch("../tests/easylist.txt")
       .then(b => b.text())
@@ -4449,24 +4772,7 @@ fetch("../tests/easylist.txt")
                                     (Math.random() < 0.3 ? "!" : "")
                             }));
 
-        const ioFilterList = document.querySelector("io-filter-list");
-        ioFilterList.filters = filters.slice(0, (Math.random() * 50) >>> 0);
-        // triggered when a filter is set as enabled
-        ioFilterList.addEventListener("filter:enable", window.console.log);
-        // triggered when a filter is set as disabled
-        ioFilterList.addEventListener("filter:disable", window.console.log);
-        // triggered when a row (and a filter) is removed
-        ioFilterList.addEventListener("filter:remove", window.console.log);
-        // triggered when an edit is being performed
-        // if preventDefault() is invoked no update would ever happen
-        ioFilterList.addEventListener("filter:edit", (event) =>
-        {
-          // simulate a failure if the filter contains $$
-          if (/\$\$/.test(event.detail))
-            event.preventDefault();
-        });
-        // triggered when a filter is updated
-        ioFilterList.addEventListener("filter:update", window.console.log);
+        document.querySelector("io-filter-table").filters = filters;
       });
 
-},{"../js/io-filter-list":3}]},{},[23]);
+},{"../js/io-filter-table":5}]},{},[25]);
