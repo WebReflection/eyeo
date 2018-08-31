@@ -275,6 +275,3 @@ io-filter-table {
 
 io-filter-table > io-filter-list > table {
   border-top: 0; }
-
-io-filter-table > io-filter-list > io-scrollbar {
-  margin-top: -1px; }

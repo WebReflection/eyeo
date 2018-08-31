@@ -669,12 +669,15 @@ class IOFilterSearch extends IOElement
   set filters(value) { this.setState({filters: value || []}); }
 
   get match() { return this.state.match; }
+
+  // match is a number between 0 and 1
+  // 1 means exact match
+  // 0 means match disabled as in no filter:match event ever
   set match(value)
   {
-    // match 0, false, null, NaN makes no sense
-    // so whenever match isn't a number between 0.1
-    // and 1, it's set as "match same" automatically
-    this.setState({match: parseFloat(value) || 1}, false);
+    this.setState({
+      match: Math.max(0, Math.min(1, parseFloat(value) || 0))
+    }, false);
   }
 
   get value() { return $("input", this).value; }
@@ -719,13 +722,15 @@ class IOFilterSearch extends IOElement
 
   onkeyup()
   {
+    const {match, value} = this;
+    if (!match)
+      return;
     clearTimeout(this._timer);
     // debounce the search to avoid degrading
     // performance on very long list of filters
     this._timer = setTimeout(() =>
     {
       this._timer = 0;
-      const {match, value} = this;
       const searchLength = value.length;
       if (!searchLength)
         return;
