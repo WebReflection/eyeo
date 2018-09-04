@@ -152,7 +152,7 @@ io-filter-list thead[data-sort="hits"] th[data-info="hits"]::after {
 
 io-filter-list > io-scrollbar {
   position: absolute;
-  top: 30px;
+  top: 29px;
   bottom: 0; }
 
 html:not([dir="rtl"]) io-filter-list > io-scrollbar {

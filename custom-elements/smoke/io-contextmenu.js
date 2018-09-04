@@ -18,41 +18,81 @@
 
 "use strict";
 
-const {slice} = Array.prototype;
+const IOElement = require("./io-element");
 
-const $$ = (selector, container = document) =>
-            container.querySelectorAll(selector);
+const {utils} = IOElement;
 
-module.exports = {
-  $: (selector, container = document) => container.querySelector(selector),
-  // while Symbol.iterator is needed for for/of loops
-  // the forEach method was introduced after and it's handy
-  // in some circumstance, hence a better check, without the need
-  // to pollute the global prototype.
-  $$: "forEach" in NodeList.prototype ?
-      $$ :
-      (selector, container = document) => slice.call($$(selector, container)),
-  // helper to provide the relative coordinates
-  // to the closest positioned containing element
-  relativeCoordinates(event)
+class IOContextMenu extends IOElement
+{
+  created()
   {
-    let el = event.currentTarget;
-    let x = 0;
-    let y = 0;
-    do
-    {
-      x += el.offsetLeft - el.scrollLeft;
-      y += el.offsetTop - el.scrollTop;
-    } while (
-      (el = el.offsetParent) &&
-      !isNaN(el.offsetLeft) &&
-      !isNaN(el.offsetTop)
-    );
-    return {x: event.pageX - x, y: event.pageY - y};
-  }
-};
+    // intercept all children clicks
+    for (const node of this.children)
+      node.addEventListener("click", this, true);
 
-},{}],2:[function(require,module,exports){
+    // handle future nodes too
+    this._mo = new MutationObserver((mutationsList) =>
+    {
+      for (const mutation of mutationsList)
+      {
+        for (const node of mutation.addedNodes)
+          node.addEventListener("click", this, true);
+        for (const node of mutation.removedNodes)
+          node.removeEventListener("click", this, true);
+      }
+    });
+
+    this._mo.observe(this, {childList: true});
+
+    this.ownerDocument.defaultView
+        .addEventListener("contextmenu", this, true);
+  }
+
+  oncontextmenu(event)
+  {
+    nope(event);
+    this.style.display = "block";
+    // set all variables at once
+    this.style.cssText += `
+      --top: ${event.pageY}px;
+      --left: ${event.pageX}px;
+      --width: ${this.clientWidth}px;
+    `;
+    // intercept page events
+    this.ownerDocument.addEventListener("click", this, true);
+    this.ownerDocument.addEventListener("scroll", nope, true);
+    this.ownerDocument.addEventListener("wheel", nope, true);
+  }
+
+  onclick(event)
+  {
+    if (!utils.event.isLeftClick(event))
+      return;
+    event.preventDefault();
+    this.style.cssText = "";
+    this.ownerDocument.removeEventListener("click", this, true);
+    this.ownerDocument.removeEventListener("scroll", nope, true);
+    this.ownerDocument.removeEventListener("wheel", nope, true);
+    if (event.currentTarget !== this.ownerDocument)
+      this.dispatchEvent(new CustomEvent("contextmenu:item", {
+        // pass along the item that was clicked
+        detail: event.currentTarget,
+        bubbles: true
+      }));
+  }
+}
+
+IOContextMenu.define("io-contextmenu");
+
+module.exports = IOContextMenu;
+
+function nope(event)
+{
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+},{"./io-element":2}],2:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -211,667 +251,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":5,"hyperhtml-element/cjs":6}],3:[function(require,module,exports){
-/*
- * This file is part of Adblock Plus <https://adblockplus.org/>,
- * Copyright (C) 2006-present eyeo GmbH
- *
- * Adblock Plus is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
- *
- * Adblock Plus is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-"use strict";
-
-const IOElement = require("./io-element");
-const IOScrollbar = require("./io-scrollbar");
-const {utils, wire} = IOElement;
-
-const {$, $$} = require("./dom");
-
-// <io-filter-list disabled />.{filters = [...]}
-class IOFilterList extends IOElement
-{
-  get defaultState()
-  {
-    return {
-      infinite: false,
-      contentEditable: false,
-      filters: [],
-      viewHeight: 0,
-      rowHeight: 0,
-      scrollTop: 0,
-      scrollHeight: 0,
-      tbody: null,
-      sort: {
-        status: false,
-        rule: false,
-        warning: false,
-        hits: false
-      },
-      sortMap: {
-        status: "enabled",
-        rule: "text",
-        warning: "slow",
-        hits: "hits"
-      }
-    };
-  }
-
-  static get observedAttributes()
-  {
-    return ["disabled", "filters"];
-  }
-
-  get disabled()
-  {
-    return this.hasAttribute("disabled");
-  }
-
-  set disabled(value)
-  {
-    utils.boolean.attribute(this, "disabled", value);
-    this.setState({contentEditable: !this.disabled});
-  }
-
-  get filters()
-  {
-    return this.state.filters || [];
-  }
-
-  set filters(value)
-  {
-    // render one row only for the setup
-    this.setState({
-      infinite: false,
-      filters: value.slice(0, 1)
-    });
-    // if filters have more than a row
-    // prepare the table with a new state
-    if (value.length)
-    {
-      setupTable.call(this);
-      const tbody = $("tbody", this);
-      const rowHeight = $("tr", tbody).clientHeight;
-      const viewHeight = tbody.clientHeight;
-      this.setState({
-        infinite: true,
-        contentEditable: !this.disabled,
-        // copied it to avoid surprises
-        filters: value.slice(),
-        scrollTop: tbody.scrollTop,
-        // one day I will understand where those 7px come from
-        scrollHeight: rowHeight * value.length - viewHeight + 7,
-        viewHeight,
-        rowHeight
-      });
-      // needed mostly for Firefox and Edge to have extra rows
-      // reflecting the same weight of others
-      this.style.setProperty("--row-height", `${rowHeight}px`);
-      // setup the scrollbar size too
-      this.scrollbar.size = rowHeight * value.length;
-    }
-  }
-
-  created()
-  {
-    this.scrollbar = new IOScrollbar();
-    this.scrollbar.direction = "vertical";
-    this.scrollbar.addEventListener("scroll", () =>
-    {
-      const {position, range} = this.scrollbar;
-      const {scrollHeight} = this.state;
-      this.setState({
-        scrollTop: scrollHeight * position / range
-      });
-    });
-    this.addEventListener(
-      "wheel",
-      event =>
-      {
-        event.preventDefault();
-        // prevent race conditions between the blur event and the scroll
-        const activeElement = this.ownerDocument.activeElement;
-        if (activeElement && activeElement !== this.ownerDocument.body)
-        {
-          activeElement.blur();
-          return;
-        }
-        const {scrollHeight, scrollTop} = this.state;
-        this.setState({
-          scrollTop: Math.max(
-            0,
-            Math.min(scrollHeight, scrollTop + event.deltaY)
-          )
-        });
-        // update the scrollbar position accordingly
-        const {range} = this.scrollbar;
-        this.scrollbar.position = this.state.scrollTop * range / scrollHeight;
-      },
-      {passive: false}
-    );
-  }
-
-  scrollTo(row)
-  {
-    const {rowHeight} = this.state;
-    this.setState({
-      scrollTop: this.filters.findIndex(filter => filter === row) * rowHeight
-    });
-  }
-
-  onheaderclick(event)
-  {
-    const th = event.target.closest("th");
-    if (!utils.event.isLeftClick(event) || !th)
-      return;
-    const {info} = th.dataset;
-    if (info === "remove")
-      return;
-    event.preventDefault();
-    const {sort, sortMap} = this.state;
-    sort[info] = !sort[info];
-    const sorter = sort[info] ? 1 : -1;
-    const property = sortMap[info];
-    this.filters.sort((fa, fb) =>
-    {
-      if (fa[property] === fb[property])
-        return 0;
-      return fa[property] < fb[property] ? -sorter : sorter;
-    });
-    this.render();
-    th.closest("thead").dataset.sort = info;
-    th.closest("thead").dataset.dir = sort[info] ? "asc" : "desc";
-  }
-
-  onkeydown(event)
-  {
-    if (event.key === " ")
-      event.preventDefault();
-  }
-
-  onkeyup(event)
-  {
-    const update = event.key === "Enter" || event.type === "blur";
-    const {currentTarget} = event;
-    if (update)
-      currentTarget.blur();
-    const text = currentTarget.textContent.trim();
-    if (dispatch.call(this, "edit", text).defaultPrevented)
-    {
-      currentTarget.closest("tr").classList.add("invalid");
-      return;
-    }
-    currentTarget.closest("tr").classList.remove("invalid");
-    if (update)
-    {
-      const {rule} = currentTarget.dataset;
-      const filter = this.filters.find(item => item.text === rule);
-      filter.text = text;
-      dispatch.call(this, "update", filter);
-      this.render();
-    }
-  }
-
-  onblur(event)
-  {
-    this.onkeyup(event);
-  }
-
-  onrowclick(event)
-  {
-    if (
-      !utils.event.isLeftClick(event) ||
-      event.currentTarget.classList.contains("empty")
-    )
-      return;
-    const td = event.target.closest("td");
-    if (!td)
-      return;
-    const {info} = td.dataset;
-    const div = $('td[data-info="rule"] > [contenteditable]', td.parentNode);
-    const {textContent} = div;
-    const filter = this.filters.find(item => item.text === textContent);
-    if (info === "remove")
-    {
-      dispatch.call(this, info, filter);
-      this.filters.splice(this.filters.indexOf(filter), 1);
-      updateScrollbar.call(this);
-    }
-    else if (info === "status")
-    {
-      dispatch.call(this, filter.enabled ? "disable" : "enable", filter);
-      filter.enabled = !filter.enabled;
-      this.render();
-    }
-  }
-
-  render()
-  {
-    let list = this.state.filters;
-    if (this.state.infinite)
-    {
-      list = [];
-      const {rowHeight, scrollTop, viewHeight} = this.state;
-      const length = this.state.filters.length;
-      let count = 0;
-      let i = Math.max(0, Math.floor(scrollTop / rowHeight));
-      this._stripes = i % 2;
-      // always add an extra row to make scrolling smooth
-      while ((count * rowHeight) < (viewHeight + rowHeight))
-      {
-        list[count++] = i < length ? this.state.filters[i++] : null;
-      }
-    }
-    this.html`<table cellpadding="0" cellspacing="0">
-      <thead onclick="${this}" data-call="onheaderclick">
-        <th data-info="status">${{i18n: "options_filter_list_status"}}</th>
-        <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
-        <th data-info="warning">!</th>
-        <th data-info="hits">${{i18n: "options_filter_list_hits"}}</th>
-        <th data-info="remove"></th>
-      </thead>
-      <tbody>${list.map(getRow, this)}</tbody>
-    </table>
-    ${this.scrollbar}`;
-    const {tbody, scrollTop, rowHeight} = this.state;
-    if (this.state.infinite)
-    {
-      tbody.scrollTop = scrollTop % rowHeight;
-    }
-    // keep growing the fake list until the tbody becomes scrollable
-    else if (!tbody || tbody.scrollHeight <= tbody.clientHeight)
-    {
-      this.setState({
-        tbody: tbody || $("tbody", this),
-        filters: list.concat(Object.create(list[0] || {}))
-      });
-    }
-  }
-}
-
-IOFilterList.define("io-filter-list");
-
-module.exports = IOFilterList;
-
-// Please note: the contenteditable=${...} attribute
-// cannot be set directly to the TD because of an ugly
-// MS Edge b ug that does not allow TDs to be editable.
-function getRow(filter, i)
-{
-  const className = ((this._stripes + i) % 2) ? "odd" : "even";
-  const {contentEditable} = this.state;
-  if (filter)
-    return wire(filter)`
-    <tr class="${className}" onclick="${this}" data-call="onrowclick">
-      <td data-info="status">
-        <input type="checkbox" checked="${filter.enabled}">
-      </td>
-      <td data-info="rule">
-        <div
-          contenteditable="${contentEditable}"
-          data-rule="${filter.text}"
-          onkeydown="${this}"
-          onkeyup="${this}"
-          onblur="${this}"
-        >${filter.text}</div>
-      </td>
-      <td data-info="warning">
-        ${getWarning(filter)}
-      </td>
-      <td data-info="hits">
-        ${filter.hits}
-      </td>
-      <td data-info="remove">
-        <button/>
-      </td>
-    </tr>`;
-  // no filter results into an empty, not editable, row
-  return wire(this, `:${i}`)`
-    <tr
-      class="${className + " empty"}"
-      onclick="${this}"
-      data-call="onrowclick"
-    >
-      <td data-info="status"></td>
-      <td data-info="rule"></td>
-      <td data-info="warning"></td>
-      <td data-info="hits"></td>
-      <td data-info="remove"></td>
-    </tr>`;
-}
-
-const snails = new WeakMap();
-const createSnail = (filter) =>
-{
-  const snail = wire()`
-    <img src="skin/icons/snail.svg" title="${filter.slow}">`;
-  snails.set(filter, snail);
-  return snail;
-};
-function getWarning(filter)
-{
-  switch (filter.slow)
-  {
-    case "🐌":
-      return snails.get(filter) || createSnail(filter);
-    case "!":
-      return "!";
-    default:
-      return "";
-  }
-}
-
-function dispatch(info, detail)
-{
-  const event = new CustomEvent(`filter:${info}`, {
-    detail,
-    bubbles: true,
-    cancelable: true
-  });
-  this.dispatchEvent(event);
-  return event;
-}
-
-/*
-  to have a scrollable body, thead and tbody are set
-  as display: block, detaching their auto table alignment
-  so that this helper would set each header TH size accordingly
- */
-function setupTable()
-{
-  const table = $("table", this);
-  const THs = $$("thead th", this);
-  const TDs = $$("tbody tr:first-child td", table);
-  const size = [];
-  THs.forEach((th, i) =>
-  {
-    table.style.setProperty(`--width-${th.dataset.info}`, "auto");
-    size[i] = Math.max(th.clientWidth, TDs[i].clientWidth);
-  });
-  THs.forEach((th, i) =>
-  {
-    if (th.dataset.info === "rule")
-    {
-      size[i] = table.clientWidth -
-                size.reduce((total, current) => total + current, -size[i]);
-    }
-    table.style.setProperty(`--width-${th.dataset.info}`, `${size[i]}px`);
-  });
-  table.classList.add("visible");
-}
-
-function updateScrollbar()
-{
-  const {rowHeight, viewHeight} = this.state;
-  const {length} = this.filters;
-  this.scrollbar.size = rowHeight * length;
-  this.setState({
-    scrollHeight: rowHeight * length - viewHeight + 7
-  });
-}
-
-},{"./dom":1,"./io-element":2,"./io-scrollbar":4}],4:[function(require,module,exports){
-/*
- * This file is part of Adblock Plus <https://adblockplus.org/>,
- * Copyright (C) 2006-present eyeo GmbH
- *
- * Adblock Plus is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
- *
- * Adblock Plus is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-"use strict";
-
-const IOElement = require("./io-element");
-const {relativeCoordinates} = require("./dom");
-
-const {isLeftClick} = IOElement.utils.event;
-
-class IOScrollbar extends IOElement
-{
-  static get observedAttributes()
-  {
-    return ["direction", "position", "size"];
-  }
-
-  created()
-  {
-    this.addEventListener(
-      "click",
-      (event) =>
-      {
-        // ignore clicks on the slider or right clicks
-        if (event.target !== this || !isLeftClick(event))
-          return;
-        // prevents clicks action on the component
-        // after dragging the slider so that it won't
-        // be re-positioned again on click coordinates
-        if (this._dragging)
-        {
-          this._dragging = false;
-          return;
-        }
-        const {x, y} = relativeCoordinates(event);
-        if (this.direction === "horizontal")
-          setPosition.call(this, x - (this._sliderSize / 2));
-        else if (this.direction === "vertical")
-          setPosition.call(this, y - (this._sliderSize / 2));
-        this.dispatchEvent(new CustomEvent("scroll"));
-      }
-    );
-    this.addEventListener(
-      "wheel",
-      (event) =>
-      {
-        stop(event);
-        let delta = 0;
-        if (this.direction === "vertical")
-          delta = event.deltaY;
-        else if (this.direction === "horizontal")
-          delta = event.deltaX;
-        // this extra delta transformation is mostly needed for MS Edge
-        // but it works OK in every other browser too
-        delta = delta * this._sliderSize / this.size;
-        setPosition.call(this, this.position + delta);
-        this.dispatchEvent(new CustomEvent("scroll"));
-      },
-      {passive: false}
-    );
-  }
-
-  get defaultState()
-  {
-    return {
-      direction: "",
-      position: 0,
-      size: 0
-    };
-  }
-
-  get direction()
-  {
-    return this.state.direction;
-  }
-
-  // can be (ignore case) horizontal or vertical
-  set direction(value)
-  {
-    value = value.toLowerCase();
-    this.setState({direction: value});
-    this.setAttribute("direction", value);
-    // trigger eventual size recalculation
-    sizeChange.call(this);
-  }
-
-  get position()
-  {
-    return this.state.position || 0;
-  }
-
-  set position(value)
-  {
-    // if created procedurally
-    // the basic DOM info might not be there yet
-    if (!this._elSize)
-    {
-      // in that case re-calculate the size
-      sizeChange.call(this);
-      // and if it's still unknown get out
-      if (!this._elSize)
-        return;
-    }
-    setPosition.call(this, value);
-  }
-
-  // read-only: the amount of positions covered by the slider
-  get range()
-  {
-    return this._elSize - this._sliderSize;
-  }
-
-  get size()
-  {
-    return this.state.size;
-  }
-
-  set size(value)
-  {
-    this.setState({size: parseInt(value, 10)});
-    sizeChange.call(this);
-  }
-
-  onmousedown(event)
-  {
-    if (!isLeftClick(event))
-      return;
-    this._dragging = true;
-    this._coords = {
-      x: event.clientX,
-      y: event.clientY
-    };
-    const slider = event.currentTarget;
-    const doc = slider.ownerDocument;
-    // use the document as source of mouse events truth
-    // use true as third option to intercept before bubbling
-    doc.addEventListener("mousemove", this, true);
-    doc.addEventListener("mouseup", this, true);
-    // also prevents selection like a native scrollbar would
-    // (this is specially needed for Firefox and Edge)
-    doc.addEventListener("selectstart", stop, true);
-  }
-
-  onmousemove(event)
-  {
-    const {x, y} = this._coords;
-    if (this.direction === "horizontal")
-    {
-      const {clientX} = event;
-      setPosition.call(this, this.position + clientX - x);
-      this._coords.x = clientX;
-    }
-    else if (this.direction === "vertical")
-    {
-      const {clientY} = event;
-      setPosition.call(this, this.position + clientY - y);
-      this._coords.y = clientY;
-    }
-    this.dispatchEvent(new CustomEvent("scroll"));
-  }
-
-  onmouseup(event)
-  {
-    if (!isLeftClick(event))
-      return;
-    const {currentTarget: doc, target} = event;
-    doc.removeEventListener("mousemove", this, true);
-    doc.removeEventListener("mouseup", this, true);
-    doc.removeEventListener("selectstart", stop, true);
-    // stop dragging if mouseup happens outside this component
-    // or within this component slider (the only child)
-    // otherwise let the click handler ignore the action
-    // which happens through the component itself
-    if (target !== this || target === this.child)
-      this._dragging = false;
-  }
-
-  render()
-  {
-    // the component and its slider are styled 100% through CSS, i.e.
-    // io-scrollbar[direction="vertical"] > .slider {}
-    this.html`<div
-      class="slider"
-      onmousedown="${this}"
-    />`;
-  }
-}
-
-IOScrollbar.define("io-scrollbar");
-
-module.exports = IOScrollbar;
-
-function setPosition(value)
-{
-  this.setState({
-    position: Math.max(
-      0,
-      Math.min(
-        parseFloat(value),
-        this.range
-      )
-    )
-  });
-  this.style.setProperty(
-    "--position",
-    this.state.position + "px"
-  );
-}
-
-function sizeChange()
-{
-  if (this.direction === "horizontal")
-    this._elSize = this.clientWidth;
-  else if (this.direction === "vertical")
-    this._elSize = this.clientHeight;
-  this._sliderSize = Math.floor(
-    Math.min(1, this._elSize / this.state.size) * this._elSize
-  );
-  if (this.direction === "horizontal")
-    this._sliderSize = Math.max(this._sliderSize, this.clientHeight);
-  else if (this.direction === "vertical")
-    this._sliderSize = Math.max(this._sliderSize, this.clientWidth);
-  this.style.setProperty("--slider-size", this._sliderSize + "px");
-  // trigger eventual position recalculation
-  // once this._elSize change
-  // set again the style to re-position the scroller
-  setPosition.call(this, this.position);
-}
-
-// if inside a container with its own wheel or mouse events,
-// avoid possible backfiring through already handled events.
-function stop(event)
-{
-  event.preventDefault();
-  event.stopPropagation();
-}
-
-},{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
+},{"document-register-element/pony":3,"hyperhtml-element/cjs":4}],3:[function(require,module,exports){
 /*!
 ISC License
 
@@ -2379,7 +1759,7 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],6:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 'use strict';
 /*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
@@ -2759,7 +2139,7 @@ function isReady(created) {
   return false;
 }
 
-},{"hyperhtml/cjs":11}],7:[function(require,module,exports){
+},{"hyperhtml/cjs":9}],5:[function(require,module,exports){
 'use strict';
 const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
@@ -2916,7 +2296,7 @@ const setValue = (self, secret, value) =>
   })[secret]
 ;
 
-},{"../shared/poorlyfills.js":20}],8:[function(require,module,exports){
+},{"../shared/poorlyfills.js":18}],6:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -2951,7 +2331,7 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":18,"../shared/utils.js":22}],9:[function(require,module,exports){
+},{"../shared/easy-dom.js":16,"../shared/utils.js":20}],7:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
 const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
@@ -3033,7 +2413,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":15,"../shared/constants.js":16,"../shared/poorlyfills.js":20,"../shared/re.js":21,"../shared/utils.js":22}],10:[function(require,module,exports){
+},{"../objects/Updates.js":13,"../shared/constants.js":14,"../shared/poorlyfills.js":18,"../shared/re.js":19,"../shared/utils.js":20}],8:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -3133,7 +2513,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./render.js":9}],11:[function(require,module,exports){
+},{"../classes/Wire.js":6,"../shared/constants.js":14,"../shared/easy-dom.js":16,"../shared/poorlyfills.js":18,"../shared/utils.js":20,"./render.js":7}],9:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -3195,7 +2575,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./classes/Component.js":7,"./hyper/render.js":9,"./hyper/wire.js":10,"./objects/Intent.js":12,"./shared/domdiff.js":17}],12:[function(require,module,exports){
+},{"./classes/Component.js":5,"./hyper/render.js":7,"./hyper/wire.js":8,"./objects/Intent.js":10,"./shared/domdiff.js":15}],10:[function(require,module,exports){
 'use strict';
 const attributes = {};
 const intents = {};
@@ -3237,7 +2617,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],13:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -3297,7 +2677,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":16}],14:[function(require,module,exports){
+},{"../shared/constants.js":14}],12:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -3370,7 +2750,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],15:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -3894,7 +3274,7 @@ function observe() {
   }
 }
 
-},{"../classes/Component.js":7,"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/domdiff.js":17,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./Intent.js":12,"./Path.js":13,"./Style.js":14}],16:[function(require,module,exports){
+},{"../classes/Component.js":5,"../classes/Wire.js":6,"../shared/constants.js":14,"../shared/domdiff.js":15,"../shared/easy-dom.js":16,"../shared/poorlyfills.js":18,"../shared/utils.js":20,"./Intent.js":10,"./Path.js":11,"./Style.js":12}],14:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -3939,7 +3319,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],17:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 /*! (c) 2017 Andrea Giammarchi (ISC) */
@@ -4103,7 +3483,7 @@ const domdiff = (
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
 
-},{}],18:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -4115,7 +3495,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],19:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -4142,7 +3522,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":18}],20:[function(require,module,exports){
+},{"./easy-dom.js":16}],18:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -4216,7 +3596,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":16}],21:[function(require,module,exports){
+},{"./constants.js":14}],19:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -4241,7 +3621,7 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],22:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
@@ -4448,43 +3828,11 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":16,"./easy-dom.js":18,"./features-detection.js":19,"./poorlyfills.js":20,"./re.js":21}],23:[function(require,module,exports){
+},{"./constants.js":14,"./easy-dom.js":16,"./features-detection.js":17,"./poorlyfills.js":18,"./re.js":19}],21:[function(require,module,exports){
 "use strict";
 
-require("../js/io-filter-list");
+require("../js/io-contextmenu");
 
-fetch("../tests/easylist.txt")
-      .then(b => b.text())
-      .then(text =>
-      {
-        const filters = text.replace(/^[![].*/gm, "").split("\n")
-                            .filter(line => line.trim().length)
-                            .map(line => ({
-                              enabled: Math.random() < 0.5,
-                              text: line,
-                              hits: (Math.random() * 9) >>> 0,
-                              slow: Math.random() < 0.2 ? "🐌" :
-                                    (Math.random() < 0.3 ? "!" : "")
-                            }));
+document.addEventListener("contextmenu:item", window.console.log);
 
-        const ioFilterList = document.querySelector("io-filter-list");
-        ioFilterList.filters = filters.slice(0, (Math.random() * 50) >>> 0);
-        // triggered when a filter is set as enabled
-        ioFilterList.addEventListener("filter:enable", window.console.log);
-        // triggered when a filter is set as disabled
-        ioFilterList.addEventListener("filter:disable", window.console.log);
-        // triggered when a row (and a filter) is removed
-        ioFilterList.addEventListener("filter:remove", window.console.log);
-        // triggered when an edit is being performed
-        // if preventDefault() is invoked no update would ever happen
-        ioFilterList.addEventListener("filter:edit", (event) =>
-        {
-          // simulate a failure if the filter contains $$
-          if (/\$\$/.test(event.detail))
-            event.preventDefault();
-        });
-        // triggered when a filter is updated
-        ioFilterList.addEventListener("filter:update", window.console.log);
-      });
-
-},{"../js/io-filter-list":3}]},{},[23]);
+},{"../js/io-contextmenu":1}]},{},[21]);

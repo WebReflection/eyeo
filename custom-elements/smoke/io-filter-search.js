@@ -226,21 +226,14 @@ const {$} = require("./dom");
 
 const {boolean} = IOElement.utils;
 
-// this component simply emits filter:add
-// and filter:show events
+// this component simply emits filter:add(text)
+// and filter:match({accuracy, filter}) events
 class IOFilterSearch extends IOElement
 {
-  static get observedAttributes() { return ["disabled", "filters"]; }
+  static get booleanAttributes() { return ["disabled"]; }
+  static get observedAttributes() { return ["match"]; }
 
-  get defaultState() { return {cannotAdd: true, filters: []}; }
-
-  get disabled() { return this.hasAttribute("disabled"); }
-
-  set disabled(value)
-  {
-    boolean.attribute(this, "disabled", value);
-    this.render();
-  }
+  get defaultState() { return {filterExists: true, filters: [], match: 1}; }
 
   get filters() { return this.state.filters; }
 
@@ -249,14 +242,34 @@ class IOFilterSearch extends IOElement
   // or if the component in charge should show the found one
   set filters(value) { this.setState({filters: value || []}); }
 
+  get match() { return this.state.match; }
+
+  // match is a number between 0 and 1
+  // 1 means exact match
+  // 0 means match disabled as in no filter:match event ever
+  set match(value)
+  {
+    this.setState({
+      match: Math.max(0, Math.min(1, parseFloat(value) || 0))
+    }, false);
+  }
+
   get value() { return $("input", this).value; }
 
   set value(text)
   {
     $("input", this).value = text || "";
     this.setState({
-      cannotAdd: text ? this.state.filters.some(hasValue, text) : false
+      filterExists: text ? this.state.filters.some(hasValue, text) : false
     });
+  }
+
+  attributeChangedCallback(name, previous, current)
+  {
+    if (name === "match")
+      this.match = current;
+    else
+      this.render();
   }
 
   created()
@@ -272,16 +285,20 @@ class IOFilterSearch extends IOElement
     dispatch.call(this, "filter:add", this.value);
   }
 
+  ondrop(event)
+  {
+    event.preventDefault();
+    addFilter.call(this, event.dataTransfer.getData("text"));
+  }
+
   onkeydown(event)
   {
     switch (event.key)
     {
       case "Enter":
-        if (!this.state.filters.some(hasValue, this.value))
-        {
-          $("input", this).blur();
-          this.onclick();
-        }
+        $("input", this).blur();
+        if (!this.disabled && !this.state.filters.some(hasValue, this.value))
+          addFilter.call(this, this.value);
         break;
       case " ":
         event.preventDefault();
@@ -289,20 +306,71 @@ class IOFilterSearch extends IOElement
     }
   }
 
-  onkeyup(event)
+  onkeyup()
   {
+    const {match, value} = this;
+    // no match means don't validate
+    // but also multi line (paste on old browsers)
+    // shouldn't pass through this logic (filtered later on)
+    if (!match || value.includes("\n"))
+      return;
     clearTimeout(this._timer);
     // debounce the search to avoid degrading
     // performance on very long list of filters
     this._timer = setTimeout(() =>
     {
       this._timer = 0;
-      const {value} = this;
-      const cannotAdd = this.state.filters.some(hasValue, value);
-      this.setState({cannotAdd});
-      if (cannotAdd)
-        dispatch.call(this, "filter:show", value);
-    }, 100);
+      const searchLength = value.length;
+      if (!searchLength)
+        return;
+      const {filters} = this.state;
+      const {length} = filters;
+      let closerFilter = null;
+      let lowerDistance = searchLength;
+      for (let i = 0; i < length; i++)
+      {
+        const filter = filters[i];
+        // critical performance path
+        // no need to take coercion into account
+        if (filter.text === value)
+        {
+          closerFilter = filter;
+          lowerDistance = 0;
+          break;
+        }
+        // skip levenstein distance if match is 1
+        else if (match < 1 && searchLength <= filter.text.length)
+        {
+          const distance = levenstein(value, filter.text);
+          if (distance < lowerDistance)
+          {
+            closerFilter = filter;
+            lowerDistance = distance;
+          }
+        }
+      }
+      const filterExists = !lowerDistance;
+      this.setState({filterExists});
+      let accuracy;
+      if (filterExists)
+        accuracy = 1;
+      else if (lowerDistance === searchLength)
+        accuracy = 0;
+      else
+        accuracy = 1 - lowerDistance / searchLength;
+      if (match <= accuracy)
+        dispatch.call(this, "filter:match", {
+          accuracy,
+          filter: closerFilter
+        });
+    }, 250);
+  }
+
+  onpaste(event)
+  {
+    event.preventDefault();
+    const clipboardData = event.clipboardData || window.clipboardData;
+    addFilter.call(this, clipboardData.getData("text"));
   }
 
   render()
@@ -312,17 +380,27 @@ class IOFilterSearch extends IOElement
     <input
       placeholder="${this._placeholder}"
       onkeydown="${this}" onkeyup="${this}"
+      ondrop="${this}" onpaste="${this}"
       disabled="${disabled}"
     >
     <button
       onclick="${this}"
-      disabled="${disabled || this.state.cannotAdd}">
+      disabled="${disabled || this.state.filterExists || !this.value}">
       + ${{i18n: "add"}}
     </button>`;
   }
 }
 
 IOFilterSearch.define("io-filter-search");
+
+module.exports = IOFilterSearch;
+
+function addFilter(data)
+{
+  const value = data.trim();
+  if (value.length)
+    dispatch.call(this, "filter:add", value);
+}
 
 function dispatch(type, detail)
 {
@@ -331,7 +409,45 @@ function dispatch(type, detail)
 
 function hasValue(filter)
 {
-  return filter.rule == this;
+  return filter.text == this;
+}
+
+// https://github.com/WebReflection/majinbuu/blob/master/levenstein.c
+function levenstein(from, to)
+{
+  const fromLength = from.length + 1;
+  const toLength = to.length + 1;
+  const size = fromLength * toLength;
+  const grid = new Array(size);
+  let x = 0;
+  let y = 0;
+  let X = 0;
+  let Y = 0;
+  let crow = 0;
+  grid[0] = 0;
+  while (++x < toLength)
+    grid[x] = x;
+  while (++y < fromLength)
+  {
+    X = x = 0;
+    const prow = crow;
+    crow = y * toLength;
+    grid[crow + x] = y;
+    while (++x < toLength)
+    {
+      const del = grid[prow + x] + 1;
+      const ins = grid[crow + X] + 1;
+      const sub = grid[prow + X] + (from[Y] === to[X] ? 0 : 1);
+      grid[crow + x] = del < ins ?
+                        (del < sub ?
+                          del : sub) :
+                        (ins < sub ?
+                          ins : sub);
+      ++X;
+    }
+    Y = y;
+  }
+  return grid[size - 1];
 }
 
 },{"./dom":1,"./io-element":2}],4:[function(require,module,exports){
@@ -1849,9 +1965,9 @@ module.exports = installCustomElements;
 const {Component, bind, define, hyper, wire} = require('hyperhtml/cjs');
 
 // utils to deal with custom elements builtin extends
+const ATTRIBUTE_CHANGED_CALLBACK = 'attributeChangedCallback';
 const O = Object;
 const classes = [];
-const defineProperties = O.defineProperties;
 const defineProperty = O.defineProperty;
 const getOwnPropertyDescriptor = O.getOwnPropertyDescriptor;
 const getOwnPropertyNames = O.getOwnPropertyNames;
@@ -1861,6 +1977,7 @@ const ownKeys = typeof Reflect === 'object' && Reflect.ownKeys ||
                 (o => getOwnPropertyNames(o).concat(getOwnPropertySymbols(o)));
 const setPrototypeOf = O.setPrototypeOf ||
                       ((o, p) => (o.__proto__ = p, o));
+const camel = name => name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase());
 
 class HyperHTMLElement extends HTMLElement {
 
@@ -1871,110 +1988,149 @@ class HyperHTMLElement extends HTMLElement {
     const Class = this;
     const proto = Class.prototype;
 
-    // if observedAttributes contains attributes to observe
+    const onChanged = proto[ATTRIBUTE_CHANGED_CALLBACK];
+    const hasChange = !!onChanged;
+
+    // Class.booleanAttributes
+    // -----------------------------------------------
+    // attributes defined as boolean will have
+    // an either available or not available attribute
+    // regardless of the value.
+    // All falsy values, or "false", mean attribute removed
+    // while truthy values will be set as is.
+    // Boolean attributes are also automatically observed.
+    const booleanAttributes = Class.booleanAttributes || [];
+    booleanAttributes.forEach(name => {
+      if (!(name in proto)) defineProperty(
+        proto,
+        camel(name),
+        {
+          configurable: true,
+          get() {
+            return this.hasAttribute(name);
+          },
+          set(value) {
+            if (!value || value === 'false')
+              this.removeAttribute(name);
+            else
+              this.setAttribute(name, value);
+          }
+        }
+      );
+    });
+
+    // Class.observedAttributes
+    // -------------------------------------------------------
     // HyperHTMLElement will directly reflect get/setAttribute
     // operation once these attributes are used, example:
     // el.observed = 123;
     // will automatically do
     // el.setAttribute('observed', 123);
     // triggering also the attributeChangedCallback
-    (Class.observedAttributes || []).forEach(name => {
+    const observedAttributes = Class.observedAttributes || [];
+    observedAttributes.forEach(name => {
+      // it is possible to redefine the behavior at any time
+      // simply overwriting get prop() and set prop(value)
       if (!(name in proto)) defineProperty(
         proto,
-        name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase()),
+        camel(name),
         {
           configurable: true,
-          get() { return this.getAttribute(name); },
-          set(value) { this.setAttribute(name, value); }
+          get() {
+            return this.getAttribute(name);
+          },
+          set(value) {
+            if (value == null)
+              this.removeAttribute(name);
+            else
+              this.setAttribute(name, value);
+          }
         }
       );
     });
 
-    const onChanged = proto.attributeChangedCallback;
-    const hasChange = !!onChanged;
+    // if these are defined, overwrite the observedAttributes getter
+    // to include also booleanAttributes
+    const attributes = booleanAttributes.concat(observedAttributes);
+    if (attributes.length)
+      defineProperty(Class, 'observedAttributes', {
+        get() { return attributes; }
+      });
 
-    // created() {} is an initializer method that grants
+    // created() {}
+    // ---------------------------------
+    // an initializer method that grants
     // the node is fully known to the browser.
     // It is ensured to run either after DOMContentLoaded,
     // or once there is a next sibling (stream-friendly) so that
     // you have full access to element attributes and/or childNodes.
-    const created = proto.created;
-    if (created) {
-      // used to ensure create() is called once and once only
-      defineProperty(
-        proto,
-        '_init$',
-        {
-          configurable: true,
-          writable: true,
-          value: true
-        }
-      );
+    const created = proto.created || function () {
+      this.render();
+    };
 
-      // ⚠️ if you need to overwrite/change attributeChangedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      defineProperty(
-        proto,
-        'attributeChangedCallback',
-        {
-          configurable: true,
-          value: function aCC(name, prev, curr) {
-            if (this._init$) {
-              checkReady.call(this, created);
-              if (this._init$)
-                return this._init$$.push(aCC.bind(this, name, prev, curr));
-            }
-            // ensure setting same value twice
-            // won't trigger twice attributeChangedCallback
-            if (hasChange && prev !== curr) {
-              onChanged.apply(this, arguments);
-            }
-          }
-        }
-      );
+    // used to ensure create() is called once and once only
+    defineProperty(
+      proto,
+      '_init$',
+      {
+        configurable: true,
+        writable: true,
+        value: true
+      }
+    );
 
-      // ⚠️ if you need to overwrite/change connectedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      const onConnected = proto.connectedCallback;
-      const hasConnect = !!onConnected;
-      defineProperty(
-        proto,
-        'connectedCallback',
-        {
-          configurable: true,
-          value: function cC() {
-            if (this._init$) {
-              checkReady.call(this, created);
-              if (this._init$)
-                return this._init$$.push(cC.bind(this));
-            }
-            if (hasConnect) {
-              onConnected.apply(this, arguments);
-            }
+    // allow arbitrary invoke of `el.created()`
+    // handy to monkey patch old Firefox or others
+    defineProperty(
+      proto,
+      'created',
+      {
+        value() {
+          if (this._init$)
+            checkReady.call(this, created);
+        }
+      }
+    );
+
+    defineProperty(
+      proto,
+      ATTRIBUTE_CHANGED_CALLBACK,
+      {
+        configurable: true,
+        value: function aCC(name, prev, curr) {
+          if (this._init$) {
+            checkReady.call(this, created);
+            if (this._init$)
+              return this._init$$.push(aCC.bind(this, name, prev, curr));
+          }
+          // ensure setting same value twice
+          // won't trigger twice attributeChangedCallback
+          if (hasChange && prev !== curr) {
+            onChanged.apply(this, arguments);
           }
         }
-      );
-    } else if (hasChange) {
-      // ⚠️ if you need to overwrite/change attributeChangedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      defineProperty(
-        proto,
-        'attributeChangedCallback',
-        {
-          configurable: true,
-          value(name, prev, curr) {
-            // ensure setting same value twice
-            // won't trigger twice attributeChangedCallback
-            if (prev !== curr) {
-              onChanged.apply(this, arguments);
-            }
+      }
+    );
+
+    const onConnected = proto.connectedCallback;
+    const hasConnect = !!onConnected;
+    defineProperty(
+      proto,
+      'connectedCallback',
+      {
+        configurable: true,
+        value: function cC() {
+          if (this._init$) {
+            checkReady.call(this, created);
+            if (this._init$)
+              return this._init$$.push(cC.bind(this));
+          }
+          if (hasConnect) {
+            onConnected.apply(this, arguments);
           }
         }
-      );
-    }
+      }
+    );
 
     // define lazily all handlers
     // class { handleClick() { ... }
@@ -2001,9 +2157,6 @@ class HyperHTMLElement extends HTMLElement {
     //    render() { this.html`<input oninput="${this}">`; }
     //  }
     if (!('handleEvent' in proto)) {
-      // ⚠️ if you need to overwrite/change handleEvent method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
       defineProperty(
         proto,
         'handleEvent',
@@ -2073,12 +2226,12 @@ class HyperHTMLElement extends HTMLElement {
     defineProperty(this, '_html$', {configurable: true, value: value});
   }
 
+  // overwrite this method with your own render
+  render() {}
+
   // ---------------------//
   // Basic State Handling //
   // ---------------------//
-
-  // overwrite this method with your own render
-  render() {}
 
   // define the default state object
   // you could use observed properties too
@@ -2276,6 +2429,24 @@ function setup(content) {
       state: lazyGetter('state', function () { return this.defaultState; }),
       // it is possible to define a default state that'd be always an object otherwise
       defaultState: {get() { return {}; }},
+      // dispatch a bubbling, cancelable, custom event
+      // through the first known/available node
+      dispatch: {value(type, detail) {
+        const {_wire$} = this;
+        if (_wire$) {
+          const event = new CustomEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            detail
+          });
+          event.component = this;
+          return (_wire$.dispatchEvent ?
+                    _wire$ :
+                    _wire$.childNodes[0]
+                  ).dispatchEvent(event);
+        }
+        return false;
+      }},
       // setting some property state through a new object
       // or a callback, triggers also automatically a render
       // unless explicitly specified to not do so (render === false)
@@ -2283,7 +2454,8 @@ function setup(content) {
         const target = this.state;
         const source = typeof state === 'function' ? state.call(this, target) : state;
         for (const key in source) target[key] = source[key];
-        if (render !== false) this.render();
+        if (render !== false)
+          this.render();
         return this;
       }}
     }
@@ -2299,13 +2471,25 @@ const lazyGetter = (type, fn) => {
   const secret = '_' + type + '$';
   return {
     get() {
-      return this[secret] || (this[type] = fn.call(this, type));
+      return this[secret] || setValue(this, secret, fn.call(this, type));
     },
     set(value) {
-      Object.defineProperty(this, secret, {configurable: true, value});
+      setValue(this, secret, value);
     }
   };
 };
+
+// shortcut to set value on get or set(value)
+const setValue = (self, secret, value) =>
+  Object.defineProperty(self, secret, {
+    configurable: true,
+    value: typeof value === 'function' ?
+      function () {
+        return (self._wire$ = value.apply(this, arguments));
+      } :
+      value
+  })[secret]
+;
 
 },{"../shared/poorlyfills.js":19}],7:[function(require,module,exports){
 'use strict';
@@ -2588,6 +2772,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
 },{"./classes/Component.js":6,"./hyper/render.js":8,"./hyper/wire.js":9,"./objects/Intent.js":11,"./shared/domdiff.js":16}],11:[function(require,module,exports){
 'use strict';
+const attributes = {};
 const intents = {};
 const keys = [];
 const hasOwnProperty = intents.hasOwnProperty;
@@ -2596,16 +2781,23 @@ let length = 0;
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = {
 
+  // used to invoke right away hyper:attributes
+  attributes,
+
   // hyperHTML.define('intent', (object, update) => {...})
   // can be used to define a third parts update mechanism
   // when every other known mechanism failed.
   // hyper.define('user', info => info.name);
   // hyper(node)`<p>${{user}}</p>`;
   define: (intent, callback) => {
-    if (!(intent in intents)) {
-      length = keys.push(intent);
+    if (intent.indexOf('-') < 0) {
+      if (!(intent in intents)) {
+        length = keys.push(intent);
+      }
+      intents[intent] = callback;
+    } else {
+      attributes[intent] = callback;
     }
-    intents[intent] = callback;
   },
 
   // this method is used internally as last resort
@@ -3145,6 +3337,12 @@ const setAttribute = (node, name, original) => {
           }
         }
       }
+    };
+  }
+  else if (name in Intent.attributes) {
+    return any => {
+      oldValue = Intent.attributes[name](node, any);
+      node.setAttribute(name, oldValue == null ? '' : oldValue);
     };
   }
   // in every other case, use the attribute node as it is
@@ -3836,20 +4034,20 @@ window.onload = () =>
   const ioFilterSearch = document.querySelector("io-filter-search");
 
   ioFilterSearch.filters = [
-    {rule: "a"},
-    {rule: "ab"},
-    {rule: "bcd"},
-    {rule: "test"},
-    {rule: "existent"}
+    {text: "a"},
+    {text: "ab"},
+    {text: "bcd"},
+    {text: "test"},
+    {text: "existent"}
   ];
 
   ioFilterSearch.addEventListener("filter:add", log);
-  ioFilterSearch.addEventListener("filter:show", log);
+  ioFilterSearch.addEventListener("filter:match", log);
 
   function log(event)
   {
     ioFilterSearch.nextElementSibling.textContent =
-      `${event.type.slice(7)}: ${event.detail}`;
+      `${event.type.slice(7)}: ${JSON.stringify(event.detail)}`;
   }
 };
 
