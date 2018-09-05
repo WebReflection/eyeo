@@ -753,21 +753,23 @@ class IOFilterSearch extends IOElement
       for (let i = 0; i < length; i++)
       {
         const filter = filters[i];
-        // critical performance path
-        // no need to take coercion into account
-        if (filter.text === value)
+        const filterLength = filter.text.length;
+        if (searchLength <= filterLength)
         {
-          closerFilter = filter;
-          lowerDistance = 0;
-          break;
-        }
-        // skip levenshtein distance if match is 1
-        else if (match < 1 && searchLength <= filter.text.length)
-        {
-          if (filter.text.contains(value))
+          if (filter.text === value)
           {
             closerFilter = filter;
-            lowerDistance = distance;
+            lowerDistance = 0;
+            break;
+          }
+          else if (match < 1)
+          {
+            const distance = 1 - searchLength / filterLength;
+            if (distance < lowerDistance)
+            {
+              closerFilter = filter;
+              lowerDistance = distance;
+            }
           }
         }
       }
