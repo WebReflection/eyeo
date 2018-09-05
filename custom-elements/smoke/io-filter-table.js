@@ -764,8 +764,8 @@ class IOFilterSearch extends IOElement
           }
           else if (match < 1)
           {
-            const distance = 1 - searchLength / filterLength;
-            if (distance < lowerDistance)
+            const distance = filter.text.indexOf(value);
+            if (distance >= 0 && distance < lowerDistance)
             {
               closerFilter = filter;
               lowerDistance = distance;
