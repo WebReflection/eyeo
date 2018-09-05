@@ -764,8 +764,7 @@ class IOFilterSearch extends IOElement
         // skip levenshtein distance if match is 1
         else if (match < 1 && searchLength <= filter.text.length)
         {
-          const distance = levenshtein(value, filter.text);
-          if (distance < lowerDistance)
+          if (filter.text.contains(value))
           {
             closerFilter = filter;
             lowerDistance = distance;
@@ -835,6 +834,7 @@ function hasValue(filter)
   return filter.text == this;
 }
 
+/*
 // https://github.com/WebReflection/majinbuu/blob/master/levenstein.c
 function levenshtein(from, to)
 {
@@ -872,6 +872,7 @@ function levenshtein(from, to)
   }
   return grid[size - 1];
 }
+*/
 
 },{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
 /*
