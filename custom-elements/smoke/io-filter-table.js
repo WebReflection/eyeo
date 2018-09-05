@@ -786,7 +786,7 @@ class IOFilterSearch extends IOElement
           accuracy,
           filter: closerFilter
         });
-    }, 250);
+    }, 100);
   }
 
   onpaste(event)
@@ -897,7 +897,6 @@ const IOElement = require("./io-element");
 const IOFilterList = require("./io-filter-list");
 const IOFilterSearch = require("./io-filter-search");
 
-const {boolean} = IOElement.utils;
 const log = window.console.log;
 
 // io-filter-table is a basic controller
