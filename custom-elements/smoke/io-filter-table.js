@@ -669,7 +669,7 @@ class IOFilterSearch extends IOElement
   set match(value)
   {
     this.setState({
-      match: Math.max(0, Math.min(1, parseFloat(value) || 0))
+      match: Math.max(-1, Math.min(1, parseFloat(value) || 0))
     }, false);
   }
 
@@ -727,6 +727,9 @@ class IOFilterSearch extends IOElement
         )
           addFilter.call(this, value);
         break;
+      case "Esc":
+        this.value = "";
+        break;
     }
   }
 
@@ -745,7 +748,7 @@ class IOFilterSearch extends IOElement
     {
       this._timer = 0;
       const result = search.call(this, value);
-      if (match <= result.accuracy)
+      if (result.accuracy && match <= result.accuracy)
         dispatch.call(this, "filter:match", result);
     }, 100);
   }
@@ -781,8 +784,11 @@ module.exports = IOFilterSearch;
 function addFilter(data)
 {
   const value = data.trim();
-  if (search.call(this, value).accuracy < 1)
+  const result = search.call(this, value);
+  if (result.accuracy < 1)
     dispatch.call(this, "filter:add", value);
+  else if (result.accuracy)
+    dispatch.call(this, "filter:match", result);
 }
 
 function dispatch(type, detail)
@@ -805,7 +811,6 @@ function search(value)
     const match = this.match;
     const {filters} = this.state;
     const {length} = filters;
-    let lowerDistance = searchLength;
     for (let i = 0; i < length; i++)
     {
       const filter = filters[i];
@@ -815,26 +820,21 @@ function search(value)
         if (filter.text === value)
         {
           closerFilter = filter;
-          lowerDistance = 0;
+          accuracy = 1;
           break;
         }
-        else if (match < 1)
+        else if (match < 1 && filter.text.indexOf(value) >= 0)
         {
-          const distance = filter.text.indexOf(value);
-          if (distance >= 0 && distance < lowerDistance)
+          const tmpAccuracy = searchLength / filter.text.length;
+          if (accuracy < tmpAccuracy)
           {
             closerFilter = filter;
-            lowerDistance = distance;
+            accuracy = tmpAccuracy;
           }
         }
       }
     }
-    const filterExists = !lowerDistance;
-    this.setState({filterExists});
-    if (filterExists)
-      accuracy = 1;
-    else if (lowerDistance !== searchLength)
-      accuracy = 1 - lowerDistance / searchLength;
+    this.setState({filterExists: accuracy === 1});
   }
   return {accuracy, filter: closerFilter};
 }
@@ -873,7 +873,7 @@ class IOFilterTable extends IOElement
 
   static get observedAttributes() { return ["match"]; }
 
-  get defaultState() { return {filters: [], match: 1, ready: false}; }
+  get defaultState() { return {filters: [], match: -1, ready: false}; }
 
   created()
   {
