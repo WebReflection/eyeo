@@ -651,7 +651,7 @@ class IOFilterSearch extends IOElement
 
   static get observedAttributes() { return ["match"]; }
 
-  get defaultState() { return {filterExists: true, filters: [], match: 1}; }
+  get defaultState() { return {filterExists: true, filters: [], match: -1}; }
 
   get filters() { return this.state.filters; }
 
@@ -662,9 +662,10 @@ class IOFilterSearch extends IOElement
 
   get match() { return this.state.match; }
 
-  // match is a number between 0 and 1
+  // match is a number between -1 and 1
+  // -1 means any match
   // 1 means exact match
-  // 0 means match disabled as in no filter:match event ever
+  // 0 means match disabled => no filter:match event ever
   set match(value)
   {
     this.setState({
@@ -801,6 +802,7 @@ function search(value)
   const searchLength = value.length;
   if (searchLength)
   {
+    const match = this.match;
     const {filters} = this.state;
     const {length} = filters;
     let lowerDistance = searchLength;
@@ -836,46 +838,6 @@ function search(value)
   }
   return {accuracy, filter: closerFilter};
 }
-
-/*
-// https://github.com/WebReflection/majinbuu/blob/master/levenstein.c
-function levenshtein(from, to)
-{
-  const fromLength = from.length + 1;
-  const toLength = to.length + 1;
-  const size = fromLength * toLength;
-  const grid = new Array(size);
-  let x = 0;
-  let y = 0;
-  let X = 0;
-  let Y = 0;
-  let crow = 0;
-  grid[0] = 0;
-  while (++x < toLength)
-    grid[x] = x;
-  while (++y < fromLength)
-  {
-    X = x = 0;
-    const prow = crow;
-    crow = y * toLength;
-    grid[crow + x] = y;
-    while (++x < toLength)
-    {
-      const del = grid[prow + x] + 1;
-      const ins = grid[crow + X] + 1;
-      const sub = grid[prow + X] + (from[Y] === to[X] ? 0 : 1);
-      grid[crow + x] = del < ins ?
-                        (del < sub ?
-                          del : sub) :
-                        (ins < sub ?
-                          ins : sub);
-      ++X;
-    }
-    Y = y;
-  }
-  return grid[size - 1];
-}
-*/
 
 },{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
 /*
