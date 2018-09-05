@@ -743,56 +743,14 @@ class IOFilterSearch extends IOElement
     this._timer = setTimeout(() =>
     {
       this._timer = 0;
-      const searchLength = value.length;
-      if (!searchLength)
-        return;
-      const {filters} = this.state;
-      const {length} = filters;
-      let closerFilter = null;
-      let lowerDistance = searchLength;
-      for (let i = 0; i < length; i++)
-      {
-        const filter = filters[i];
-        const filterLength = filter.text.length;
-        if (searchLength <= filterLength)
-        {
-          if (filter.text === value)
-          {
-            closerFilter = filter;
-            lowerDistance = 0;
-            break;
-          }
-          else if (match < 1)
-          {
-            const distance = filter.text.indexOf(value);
-            if (distance >= 0 && distance < lowerDistance)
-            {
-              closerFilter = filter;
-              lowerDistance = distance;
-            }
-          }
-        }
-      }
-      const filterExists = !lowerDistance;
-      this.setState({filterExists});
-      let accuracy;
-      if (filterExists)
-        accuracy = 1;
-      else if (lowerDistance === searchLength)
-        accuracy = 0;
-      else
-        accuracy = 1 - lowerDistance / searchLength;
-      if (match <= accuracy)
-        dispatch.call(this, "filter:match", {
-          accuracy,
-          filter: closerFilter
-        });
+      const result = search.call(this, value);
+      if (match <= result.accuracy)
+        dispatch.call(this, "filter:match", result);
     }, 100);
   }
 
   onpaste(event)
   {
-    event.preventDefault();
     const clipboardData = event.clipboardData || window.clipboardData;
     addFilter.call(this, clipboardData.getData("text"));
   }
@@ -822,7 +780,7 @@ module.exports = IOFilterSearch;
 function addFilter(data)
 {
   const value = data.trim();
-  if (value.length)
+  if (search.call(this, value).accuracy < 1)
     dispatch.call(this, "filter:add", value);
 }
 
@@ -834,6 +792,49 @@ function dispatch(type, detail)
 function hasValue(filter)
 {
   return filter.text == this;
+}
+
+function search(value)
+{
+  let accuracy = 0;
+  let closerFilter = null;
+  const searchLength = value.length;
+  if (searchLength)
+  {
+    const {filters} = this.state;
+    const {length} = filters;
+    let lowerDistance = searchLength;
+    for (let i = 0; i < length; i++)
+    {
+      const filter = filters[i];
+      const filterLength = filter.text.length;
+      if (searchLength <= filterLength)
+      {
+        if (filter.text === value)
+        {
+          closerFilter = filter;
+          lowerDistance = 0;
+          break;
+        }
+        else if (match < 1)
+        {
+          const distance = filter.text.indexOf(value);
+          if (distance >= 0 && distance < lowerDistance)
+          {
+            closerFilter = filter;
+            lowerDistance = distance;
+          }
+        }
+      }
+    }
+    const filterExists = !lowerDistance;
+    this.setState({filterExists});
+    if (filterExists)
+      accuracy = 1;
+    else if (lowerDistance !== searchLength)
+      accuracy = 1 - lowerDistance / searchLength;
+  }
+  return {accuracy, filter: closerFilter};
 }
 
 /*
