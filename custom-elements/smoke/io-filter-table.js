@@ -756,7 +756,8 @@ class IOFilterSearch extends IOElement
 
   onclick()
   {
-    dispatch.call(this, "filter:add", this.value);
+    if (this.value)
+      dispatch.call(this, "filter:add", this.value);
   }
 
   ondrop(event)
@@ -836,6 +837,8 @@ module.exports = IOFilterSearch;
 function addFilter(data)
 {
   const value = data.trim();
+  if (!value)
+    return;
   const result = search.call(this, value);
   if (result.accuracy < 1)
     dispatch.call(this, "filter:add", value);
