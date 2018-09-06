@@ -289,6 +289,7 @@ class IOFilterList extends IOElement
 
   set filters(value)
   {
+    this._selected.splice(0);
     // render one row only for the setup
     this.setState({
       infinite: false,
@@ -323,6 +324,7 @@ class IOFilterList extends IOElement
 
   created()
   {
+    this._selected = [];
     this.scrollbar = new IOScrollbar();
     this.scrollbar.direction = "vertical";
     this.scrollbar.addEventListener("scroll", () =>
@@ -394,7 +396,7 @@ class IOFilterList extends IOElement
 
   onkeydown(event)
   {
-    if (event.key === " ")
+    if (event.key === "Enter")
       event.preventDefault();
   }
 
@@ -413,8 +415,8 @@ class IOFilterList extends IOElement
     currentTarget.closest("tr").classList.remove("invalid");
     if (update)
     {
-      const {rule} = currentTarget.dataset;
-      const filter = this.filters.find(item => item.text === rule);
+      const {title} = currentTarget;
+      const filter = this.filters.find(item => item.text === title);
       filter.text = text;
       dispatch.call(this, "update", filter);
       this.render();
@@ -423,33 +425,75 @@ class IOFilterList extends IOElement
 
   onblur(event)
   {
+    if (event.currentTarget.classList.contains("content"))
+      event.currentTarget.contentEditable = false;
     this.onkeyup(event);
   }
 
-  onrowclick(event)
+  onrowevent(event)
   {
+    this["onrow" + event.type](event);
+  }
+
+  onrowmousedown(event)
+  {
+    const tr = event.currentTarget;
     if (
       !utils.event.isLeftClick(event) ||
-      event.currentTarget.classList.contains("empty")
+      tr.classList.contains("empty")
     )
       return;
     const td = event.target.closest("td");
     if (!td)
       return;
     const {info} = td.dataset;
-    const div = $('td[data-info="rule"] > [contenteditable]', td.parentNode);
+    const div = $('td[data-info="rule"] > .content', td.parentNode);
     const {textContent} = div;
-    const filter = this.filters.find(item => item.text === textContent);
+    const {filters} = this;
+    const filter = filters.find(item => item.text === textContent);
     if (info === "remove")
     {
       dispatch.call(this, info, filter);
-      this.filters.splice(this.filters.indexOf(filter), 1);
+      filters.splice(filters.indexOf(filter), 1);
       updateScrollbar.call(this);
     }
     else if (info === "status")
     {
       dispatch.call(this, filter.enabled ? "disable" : "enable", filter);
       filter.enabled = !filter.enabled;
+      this.render();
+    }
+    else if (info === "rule" && tr.classList.contains("selected"))
+    {
+      this._selected = [filter];
+      this.render();
+      div.contentEditable = true;
+      div.focus();
+    }
+    else if (!tr.classList.contains("selected"))
+    {
+      if (event.shiftKey && this._selected.length)
+      {
+        const first = this._selected[0];
+        let start = filters.indexOf(first);
+        const end = filters.indexOf(filter);
+        this._selected = [first];
+        if (start < end)
+        {
+          while (start++ < end)
+            this._selected.push(filters[start]);
+        }
+        else
+        {
+          while (start-- > end)
+            this._selected.push(filters[start]);
+        }
+      }
+      else
+      {
+        // drop all entries and put the current filter in
+        this._selected = [filter];
+      }
       this.render();
     }
   }
@@ -507,18 +551,25 @@ module.exports = IOFilterList;
 // MS Edge b ug that does not allow TDs to be editable.
 function getRow(filter, i)
 {
-  const className = ((this._stripes + i) % 2) ? "odd" : "even";
-  const {contentEditable} = this.state;
+  let className = ((this._stripes + i) % 2) ? "odd" : "even";
   if (filter)
+  {
+    if (this._selected.indexOf(filter) > -1)
+      className += " selected";
     return wire(filter)`
-    <tr class="${className}" onclick="${this}" data-call="onrowclick">
+    <tr
+      class="${className}"
+      onmousedown="${this}"
+      data-call="onrowevent"
+      tabindex="0"
+    >
       <td data-info="status">
         <input type="checkbox" checked="${filter.enabled}">
       </td>
       <td data-info="rule">
         <div
-          contenteditable="${contentEditable}"
-          data-rule="${filter.text}"
+          class="content"
+          title="${filter.text}"
           onkeydown="${this}"
           onkeyup="${this}"
           onblur="${this}"
@@ -534,12 +585,13 @@ function getRow(filter, i)
         <button/>
       </td>
     </tr>`;
+  }
   // no filter results into an empty, not editable, row
   return wire(this, `:${i}`)`
     <tr
       class="${className + " empty"}"
-      onclick="${this}"
-      data-call="onrowclick"
+      onmousedown="${this}"
+      data-call="onrowevent"
     >
       <td data-info="status"></td>
       <td data-info="rule"></td>

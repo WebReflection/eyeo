@@ -106,7 +106,8 @@ io-filter-list thead th {
 
 io-filter-list tbody {
   overflow: hidden;
-  max-height: 200px; }
+  max-height: 200px;
+  user-select: none; }
 
 io-filter-list th,
 io-filter-list td {
@@ -118,27 +119,39 @@ html:not([dir="rtl"]) io-filter-list td:last-child {
   padding-right: 16px; }
 
 io-filter-list tbody tr {
-  height: var(--row-height, auto); }
+  height: var(--row-height, auto);
+  outline: none; }
 
 io-filter-list thead,
 io-filter-list tbody tr.odd {
   background-color: #f1f1f1; }
 
-io-filter-list td {
-  outline: none; }
+io-filter-list tbody tr:focus,
+io-filter-list tbody tr.odd:focus,
+io-filter-list tbody tr.selected,
+io-filter-list tbody tr.odd.selected {
+  color: #fff;
+  background-color: #3a97b9; }
+
+io-filter-list tbody tr.selected .content[contenteditable="true"],
+io-filter-list tbody tr.odd.selected .content[contenteditable="true"] {
+  color: #000;
+  background-color: #fff; }
 
 io-filter-list [data-info="status"] {
   width: var(--width-status, auto); }
 
 io-filter-list [data-info="rule"] {
-  overflow: hidden;
   width: var(--width-rule, auto);
   max-width: var(--width-rule, auto);
-  white-space: nowrap;
+  white-space: nowrap; }
+
+io-filter-list [data-info="rule"] .content {
+  overflow: hidden;
   text-overflow: ellipsis; }
 
-io-filter-list [data-info="rule"]:focus {
-  white-space: initial; }
+io-filter-list [data-info="rule"] .content:focus {
+  text-overflow: initial; }
 
 io-filter-list tr.invalid {
   background-color: #f1d1d1; }
@@ -156,6 +169,10 @@ io-filter-list [data-info="warning"] {
   width: var(--width-warning, auto); }
 
 io-filter-list [data-info="hits"] {
+  /* this might look dumb but since everything is in place already
+     and we are waiting for the extension to provide such info
+     I think we could just keep it here in the meanwhile. */
+  display: none;
   width: var(--width-hits, auto); }
 
 io-filter-list [data-info="remove"] {
