@@ -554,7 +554,7 @@ function getRow(filter, i)
   let className = ((this._stripes + i) % 2) ? "odd" : "even";
   if (filter)
   {
-    if (this._selected.indexOf(filter) > -1)
+    if ((this._selected || []).indexOf(filter) > -1)
       className += " selected";
     return wire(filter)`
     <tr
@@ -2871,19 +2871,6 @@ class HyperHTMLElement extends HTMLElement {
         configurable: true,
         writable: true,
         value: true
-      }
-    );
-
-    // allow arbitrary invoke of `el.created()`
-    // handy to monkey patch old Firefox or others
-    defineProperty(
-      proto,
-      'created',
-      {
-        value() {
-          if (this._init$)
-            checkReady.call(this, created);
-        }
       }
     );
 
