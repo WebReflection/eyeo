@@ -240,6 +240,17 @@ const {$, $$} = require("./dom");
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
 {
+  get selected()
+  {
+    return this._selected || (this._selected = []);
+  }
+
+  set selected(value)
+  {
+    this._selected = value;
+    this.render();
+  }
+
   get defaultState()
   {
     return {
@@ -289,7 +300,7 @@ class IOFilterList extends IOElement
 
   set filters(value)
   {
-    this._selected.splice(0);
+    this.selected.splice(0);
     // render one row only for the setup
     this.setState({
       infinite: false,
@@ -324,7 +335,6 @@ class IOFilterList extends IOElement
 
   created()
   {
-    this._selected = [];
     this.scrollbar = new IOScrollbar();
     this.scrollbar.direction = "vertical";
     this.scrollbar.addEventListener("scroll", () =>
@@ -465,34 +475,34 @@ class IOFilterList extends IOElement
     }
     else if (info === "rule" && tr.classList.contains("selected"))
     {
-      this._selected = [filter];
+      this.selected = [filter];
       this.render();
       div.contentEditable = true;
       div.focus();
     }
     else if (!tr.classList.contains("selected"))
     {
-      if (event.shiftKey && this._selected.length)
+      if (event.shiftKey && this.selected.length)
       {
-        const first = this._selected[0];
+        const first = this.selected[0];
         let start = filters.indexOf(first);
         const end = filters.indexOf(filter);
-        this._selected = [first];
+        this.selected = [first];
         if (start < end)
         {
           while (start++ < end)
-            this._selected.push(filters[start]);
+            this.selected.push(filters[start]);
         }
         else
         {
           while (start-- > end)
-            this._selected.push(filters[start]);
+            this.selected.push(filters[start]);
         }
       }
       else
       {
         // drop all entries and put the current filter in
-        this._selected = [filter];
+        this.selected = [filter];
       }
       this.render();
     }
@@ -554,7 +564,7 @@ function getRow(filter, i)
   let className = ((this._stripes + i) % 2) ? "odd" : "even";
   if (filter)
   {
-    if ((this._selected || []).indexOf(filter) > -1)
+    if (this.selected.indexOf(filter) > -1)
       className += " selected";
     return wire(filter)`
     <tr
