@@ -34,11 +34,12 @@
 io-filter-search {
   display: flex;
   flex-direction: row;
-  height: 32px; }
+  height: 48px; }
 
 io-filter-search > input {
   padding: 0 8px;
-  border: 1px solid #9b9b9b;
+  border: 1px solid #bcbcbc;
+  font-size: inherit;
   flex-grow: 1; }
 
 io-filter-search > button {
@@ -46,6 +47,7 @@ io-filter-search > button {
   border: 0;
   color: #fff;
   background-color: #3a97b9;
+  font-weight: 400;
   text-transform: uppercase; }
 
 io-filter-search > button:disabled {
@@ -82,15 +84,23 @@ io-filter-list table {
   /* set as visible once populated */
   visibility: hidden;
   width: 100%;
-  border: 1px solid #9b9b9b;
   color: #505050;
   background-color: #fff; }
+
+io-filter-list table {
+  border: 1px solid #bcbcbc;
+  user-select: none; }
 
 io-filter-list thead {
   user-select: none; }
 
-io-filter-list thead tr {
-  border-bottom: 1px solid #9b9b9b; }
+io-filter-list thead tr,
+io-filter-list td {
+  border-bottom: 1px solid #bcbcbc; }
+
+io-filter-list tr.empty td,
+io-filter-list tr:last-child td {
+  border-bottom: 0; }
 
 io-filter-list table.visible {
   visibility: visible; }
@@ -100,14 +110,9 @@ io-filter-list thead tr,
 io-filter-list tbody {
   display: block; }
 
-/* will show text either left or right instead of center */
-io-filter-list thead th {
-  font-weight: 400; }
-
 io-filter-list tbody {
   overflow: hidden;
-  max-height: 200px;
-  user-select: none; }
+  height: 300px; }
 
 io-filter-list th,
 io-filter-list td {
@@ -115,31 +120,32 @@ io-filter-list td {
   padding: 4px 8px;
   text-align: center; }
 
-html:not([dir="rtl"]) io-filter-list td:last-child {
-  padding-right: 16px; }
+io-filter-list th {
+  padding: 8px; }
 
 io-filter-list tbody tr {
   height: var(--row-height, auto);
   outline: none; }
 
-io-filter-list thead,
-io-filter-list tbody tr.odd {
-  background-color: #f1f1f1; }
-
-io-filter-list tbody tr:focus,
-io-filter-list tbody tr.odd:focus,
-io-filter-list tbody tr.selected,
-io-filter-list tbody tr.odd.selected {
-  color: #fff;
-  background-color: #3a97b9; }
-
-io-filter-list tbody tr.selected .content[contenteditable="true"],
-io-filter-list tbody tr.odd.selected .content[contenteditable="true"] {
-  color: #000;
-  background-color: #fff; }
+/*
+io-filter-list tbody tr.odd
+{
+  background-color: #f1f1f1;
+}
+*/
+io-filter-list tbody tr.odd.selected,
+io-filter-list tbody tr.selected {
+  background-color: #f6f6f6; }
 
 io-filter-list [data-info="status"] {
-  width: var(--width-status, auto); }
+  width: 160px;
+  white-space: nowrap; }
+
+html:not([dir="rtl"]) io-filter-list [data-info="status"] {
+  padding-right: 24px; }
+
+html[dir="rtl"] io-filter-list [data-info="status"] {
+  padding-left: 24px; }
 
 io-filter-list [data-info="rule"] {
   width: var(--width-rule, auto);
@@ -159,46 +165,20 @@ io-filter-list tr.invalid {
 io-filter-list tr.invalid [data-info="rule"] {
   color: #c11d26; }
 
-html:not([dir="rtl"]) io-filter-list [data-info="rule"] {
+html:not([dir="rtl"]) io-filter-list [data-info="rule"],
+html:not([dir="rtl"]) io-filter-list [data-info="status"] {
   text-align: left; }
 
-html[dir="rtl"] io-filter-list [data-info="rule"] {
+html[dir="rtl"] io-filter-list [data-info="rule"],
+html[dir="rtl"] io-filter-list [data-info="status"] {
   text-align: right; }
 
+io-filter-list [data-info="selected"],
 io-filter-list [data-info="warning"] {
-  width: var(--width-warning, auto); }
+  width: 72px; }
 
-io-filter-list [data-info="hits"] {
-  /* this might look dumb but since everything is in place already
-     and we are waiting for the extension to provide such info
-     I think we could just keep it here in the meanwhile. */
-  display: none;
-  width: var(--width-hits, auto); }
-
-io-filter-list [data-info="remove"] {
-  width: var(--width-remove, auto); }
-
-io-filter-list [data-info="warning"] {
-  padding: 0; }
-
-io-filter-list [data-info="warning"] img {
-  width: 80%;
-  margin: auto; }
-
-io-filter-list [data-info="remove"] button {
-  display: block;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  background-color: transparent;
-  background-image: url(icons/trash.svg?default#default);
-  background-repeat: none;
-  background-position: center;
-  background-size: contain; }
-
-io-filter-list [data-info="remove"] button:hover {
-  background-image: url(icons/trash.svg?hover#hover); }
+io-filter-list td[data-info="warning"] {
+  color: #bcbcbc; }
 
 io-filter-list thead th::after {
   display: inline-block;
@@ -215,20 +195,34 @@ io-filter-list thead[data-dir="desc"] th::after {
 
 io-filter-list thead[data-sort="status"] th[data-info="status"]::after,
 io-filter-list thead[data-sort="rule"] th[data-info="rule"]::after,
-io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after,
-io-filter-list thead[data-sort="hits"] th[data-info="hits"]::after {
+io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after {
   visibility: visible; }
 
 io-filter-list > io-scrollbar {
   position: absolute;
-  top: 29px;
-  bottom: 0; }
+  top: 46px;
+  bottom: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease-in; }
+
+io-filter-list:hover > io-scrollbar {
+  opacity: 1; }
 
 html:not([dir="rtl"]) io-filter-list > io-scrollbar {
-  right: 0; }
+  right: 12px; }
 
 html[dir="rtl"] io-filter-list > io-scrollbar {
-  left: 0; }
+  left: 12px; }
+
+io-filter-list io-toggle {
+  margin-top: 2px;
+  vertical-align: top; }
+
+html:not([dir="rtl"]) io-filter-list io-toggle {
+  margin-right: 8px; }
+
+html[dir="rtl"] io-filter-list io-toggle {
+  margin-left: 8px; }
 
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
@@ -251,7 +245,7 @@ io-scrollbar {
     related to the container height, as in ░▓░░░░░░░░░░░
     or width, in case it's a vertical scrollbar
   */
-  --size: 12px;
+  --size: 8px;
   overflow: hidden;
   cursor: default;
   user-select: none; }
@@ -264,7 +258,8 @@ io-scrollbar > .slider {
 
 io-scrollbar > .slider {
   margin: 0;
-  border: 1px solid #979797;
+  border: 0;
+  opacity: 0.7;
   background-color: #d8d8d8;
   font-size: 0;
   line-height: 0; }
@@ -285,10 +280,107 @@ io-scrollbar[direction="vertical"] > .slider {
   height: var(--slider-size, var(--size));
   transform: translateY(var(--position, 0)); }
 
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-toggle {
+  --width: 30px;
+  --height: 8px;
+  --translateY: -4px;
+  --translateX: 14px;
+  display: inline-block;
+  width: var(--width);
+  height: var(--height);
+  border-radius: 4px;
+  background-color: #9b9b9b;
+  cursor: pointer;
+  transition: background 0.2s ease-out;
+  transform: translateY(calc(var(--translateY) * -1));
+  will-change: background; }
+
+html[dir="rtl"] io-toggle {
+  --translateX: -14px; }
+
+io-toggle[checked] {
+  background-color: #92d3ea; }
+
+io-toggle[disabled] {
+  opacity: 0.5;
+  cursor: default; }
+
+io-toggle button {
+  width: calc(var(--height) * 2);
+  height: calc(var(--height) * 2);
+  padding: 0;
+  border: 2px solid #e1e0e1;
+  border-radius: var(--height);
+  outline: none;
+  cursor: pointer;
+  transition: border 0.2s ease-out, box-shadow 0.2s ease-out, transform 0.2s ease-out, width 0.2s ease-out;
+  transform: translateY(var(--translateY));
+  will-change: border, box-shadow, transform, width; }
+
+io-toggle button[aria-checked="false"] {
+  background-color: #f1f1f1;
+  box-shadow: 0 1px 2px 0 #e5d1d1; }
+
+io-toggle button[aria-checked="false"]:hover {
+  box-shadow: 0 2px 4px 0 #d3b0b0; }
+
+io-toggle button[aria-checked="true"] {
+  border: 2px solid #059cd0;
+  background-color: #059cd0;
+  box-shadow: 0 1px 2px 0 #a6cede;
+  transform: translateY(var(--translateY)) translateX(var(--translateX)); }
+
+io-toggle button[aria-checked="true"]:hover {
+  box-shadow: 0 2px 4px 0 #a6cede; }
+
+io-toggle button:focus,
+io-toggle button[aria-checked="true"]:focus {
+  border: 2px solid #87bffe; }
+
 io-filter-table {
   display: flex;
   flex-direction: column;
-  min-width: 500px; }
+  min-width: 700px; }
+
+io-filter-table > io-filter-search {
+  z-index: 1; }
+
+io-filter-table > io-filter-search > input {
+  padding-right: 24px;
+  padding-left: 24px; }
 
 io-filter-table > io-filter-list > table {
   border-top: 0; }
+
+io-filter-table .footer {
+  margin-top: 16px; }
+
+io-filter-table .footer button {
+  display: inline-block;
+  padding: 4px 8px;
+  font-weight: 400; }
+
+io-filter-table .footer .delete {
+  border: 2px solid #db394b;
+  color: #db394b; }
+
+io-filter-table .footer .copy {
+  margin: auto 16px;
+  border: 2px solid #337ba2;
+  color: #337ba2; }

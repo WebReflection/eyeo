@@ -1,7 +1,7 @@
 {
   "add": {
     "description": "This is the label for the 'Add' buttons.",
-    "message": "Add"
+    "message": "Add filter"
   },
   "options_filters_search_or_add": {
     "description": "The filter search placeholder.",

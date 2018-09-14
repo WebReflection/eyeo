@@ -1,7 +1,7 @@
 {
   "add": {
     "description": "This is the label for the 'Add' buttons.",
-    "message": "Add"
+    "message": "Add filter"
   },
   "options_filters_search_or_add": {
     "description": "The filter search placeholder.",
@@ -15,5 +15,9 @@
   },
   "options_filter_list_hits": {
     "message": "Hits"
+  },
+  "options_filterList_column_status": {
+    "description": "Column name of filter list table in Advanced tab",
+    "message": "Status"
   }
 }
