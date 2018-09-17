@@ -483,10 +483,32 @@ class IOFilterList extends IOElement
     switch (el.closest("td").dataset.info)
     {
       case "selected":
-        if (this.selected.has(filter))
-          this.selected.delete(filter);
+        if (event.shiftKey && this.selected.size)
+        {
+          let start = filters.indexOf(this._lastFilter);
+          const end = filters.indexOf(filter);
+          const method = this.selected.has(this._lastFilter) ?
+                          "add" :
+                          "delete";
+          if (start < end)
+          {
+            while (start++ < end)
+              this.selected[method](filters[start]);
+          }
+          else
+          {
+            while (start-- > end)
+              this.selected[method](filters[start]);
+          }
+        }
         else
-          this.selected.add(filter);
+        {
+          this._lastFilter = filter;
+          if (this.selected.has(filter))
+            this.selected.delete(filter);
+          else
+            this.selected.add(filter);
+        }
         break;
       case "status":
         filter.enabled = !filter.enabled;
@@ -609,7 +631,9 @@ class IOFilterList extends IOElement
     this.html`<table cellpadding="0" cellspacing="0">
       <thead onclick="${this}" data-call="onheaderclick">
         <th data-info="selected"><input type="checkbox"></th>
-        <th data-info="status">${{i18n: "options_filterList_column_status"}}</th>
+        <th data-info="status">
+          ${{i18n: "options_filterList_column_status"}}
+        </th>
         <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
         <th data-info="warning">⚠</th>
       </thead>
@@ -617,6 +641,16 @@ class IOFilterList extends IOElement
     </table>
     ${this.scrollbar}`;
     this.postRender(list);
+  }
+
+  updateScrollbar()
+  {
+    const {rowHeight, viewHeight} = this.state;
+    const {length} = this.filters;
+    this.scrollbar.size = rowHeight * length;
+    this.setState({
+      scrollHeight: rowHeight * (length + 1) - viewHeight
+    });
   }
 }
 
@@ -638,7 +672,8 @@ function getRow(filter, i)
     return wire(filter)`
     <tr class="${className}">
       <td data-info="selected">
-        <input type="checkbox" checked="${selected}" onchange="${this}">
+        <input type="checkbox" checked="${selected}"
+                onclick="${this}" data-call="onchange">
       </td>
       <td data-info="status">
         <io-toggle checked="${filter.enabled}" onchange="${this}" />
@@ -733,6 +768,7 @@ function setupTable()
   table.classList.add("visible");
 }
 
+/*
 function updateScrollbar()
 {
   const {rowHeight, viewHeight} = this.state;
@@ -742,6 +778,7 @@ function updateScrollbar()
     scrollHeight: rowHeight * (length + 1) - viewHeight
   });
 }
+*/
 
 },{"./dom":1,"./io-element":2,"./io-scrollbar":6,"./io-toggle":7}],4:[function(require,module,exports){
 /*
@@ -1059,6 +1096,7 @@ class IOFilterTable extends IOElement
           this.filters.splice(this.filters.indexOf(filter), 1);
         }
         this.list.render();
+        this.list.updateScrollbar();
         break;
       case "copy":
         const filters = [];
