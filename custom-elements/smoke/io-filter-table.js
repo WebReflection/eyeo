@@ -332,7 +332,7 @@ class IOFilterList extends IOElement
     // render one row only for the setup
     this.setState({
       infinite: false,
-      filters: value.slice(0, 1)
+      filters: []
     });
     // if filters have more than a row
     // prepare the table with a new state
@@ -400,9 +400,12 @@ class IOFilterList extends IOElement
 
   scrollTo(row)
   {
-    const {rowHeight} = this.state;
+    const {rowHeight, scrollHeight} = this.state;
     this.setState({
-      scrollTop: this.filters.findIndex(filter => filter === row) * rowHeight
+      scrollTop: Math.min(
+        scrollHeight,
+        this.filters.findIndex(filter => filter === row) * rowHeight
+      )
     });
   }
 
@@ -889,7 +892,7 @@ class IOFilterSearch extends IOElement
         )
           addFilter.call(this, value);
         break;
-      case "Esc":
+      case "Escape":
         this.value = "";
         break;
     }
@@ -933,9 +936,8 @@ class IOFilterSearch extends IOElement
     >
     <button
       onclick="${this}"
-      disabled="${disabled || this.state.filterExists || !this.value}"
-    >
-      ${{i18n: "add"}}
+      disabled="${disabled || this.state.filterExists || !this.value}">
+      + ${{i18n: "add"}}
     </button>`;
   }
 }
@@ -980,7 +982,11 @@ function search(value)
     {
       const filter = filters[i];
       const filterLength = filter.text.length;
-      if (searchLength <= filterLength)
+      // ignore all filters shorter than current search
+      if (searchLength > filterLength)
+        continue;
+      // compare the two strings only if length is the same
+      if (searchLength === filterLength)
       {
         if (filter.text === value)
         {
@@ -988,14 +994,17 @@ function search(value)
           accuracy = 1;
           break;
         }
-        else if (match < 1 && filter.text.indexOf(value) >= 0)
+        continue;
+      }
+      // otherwise verify text includes searched value
+      // only if the match is not meant to be 1:1
+      if (match < 1 && filter.text.includes(value))
+      {
+        const tmpAccuracy = searchLength / filterLength;
+        if (accuracy < tmpAccuracy)
         {
-          const tmpAccuracy = searchLength / filter.text.length;
-          if (accuracy < tmpAccuracy)
-          {
-            closerFilter = filter;
-            accuracy = tmpAccuracy;
-          }
+          closerFilter = filter;
+          accuracy = tmpAccuracy;
         }
       }
     }
@@ -1048,7 +1057,10 @@ class IOFilterTable extends IOElement
   {
     this._showing = null;
     this.search = this.appendChild(new IOFilterSearch());
-    this.search.addEventListener("filter:add", log);
+    this.search.addEventListener(
+      "filter:add",
+      event => this.onFilterAdd(event)
+    );
     this.search.addEventListener(
       "filter:match",
       event => this.onFilterMatch(event)
@@ -1107,6 +1119,26 @@ class IOFilterTable extends IOElement
         clipboard.copy(filters.join("\n"));
         break;
     }
+  }
+
+  onFilterAdd(event)
+  {
+    const filters = event.detail
+                    .split(/(?:\r\n|\n)/)
+                    .map(text =>
+                    {
+                      return this.filters.find(
+                        filter => filter.text === text
+                      ) || {text, new: true};
+                    });
+    for (const filter of filters)
+    {
+      if (!filter.new)
+        this.filters.splice(this.filters.indexOf(filter), 1);
+      this.filters.unshift(filter);
+    }
+    this.list.scrollTo(this.filters[0]);
+    setTimeout(() => this.search.value = "");
   }
 
   onFilterMatch(event)
@@ -3002,9 +3034,9 @@ module.exports = installCustomElements;
 const {Component, bind, define, hyper, wire} = require('hyperhtml/cjs');
 
 // utils to deal with custom elements builtin extends
-const ATTRIBUTE_CHANGED_CALLBACK = 'attributeChangedCallback';
 const O = Object;
 const classes = [];
+const defineProperties = O.defineProperties;
 const defineProperty = O.defineProperty;
 const getOwnPropertyDescriptor = O.getOwnPropertyDescriptor;
 const getOwnPropertyNames = O.getOwnPropertyNames;
@@ -3024,78 +3056,29 @@ class HyperHTMLElement extends HTMLElement {
     const Class = this;
     const proto = Class.prototype;
 
-    const onChanged = proto[ATTRIBUTE_CHANGED_CALLBACK];
-    const hasChange = !!onChanged;
-
-    // Class.booleanAttributes
-    // -----------------------------------------------
-    // attributes defined as boolean will have
-    // an either available or not available attribute
-    // regardless of the value.
-    // All falsy values, or "false", mean attribute removed
-    // while truthy values will be set as is.
-    // Boolean attributes are also automatically observed.
-    const booleanAttributes = Class.booleanAttributes || [];
-    booleanAttributes.forEach(name => {
-      if (!(name in proto)) defineProperty(
-        proto,
-        name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase()),
-        {
-          configurable: true,
-          get() {
-            return this.hasAttribute(name);
-          },
-          set(value) {
-            if (!value || value === 'false')
-              this.removeAttribute(name);
-            else
-              this.setAttribute(name, value);
-          }
-        }
-      );
-    });
-
-    // Class.observedAttributes
-    // -------------------------------------------------------
+    // if observedAttributes contains attributes to observe
     // HyperHTMLElement will directly reflect get/setAttribute
     // operation once these attributes are used, example:
     // el.observed = 123;
     // will automatically do
     // el.setAttribute('observed', 123);
     // triggering also the attributeChangedCallback
-    const observedAttributes = Class.observedAttributes || [];
-    observedAttributes.forEach(name => {
-      // it is possible to redefine the behavior at any time
-      // simply overwriting get prop() and set prop(value)
+    (Class.observedAttributes || []).forEach(name => {
       if (!(name in proto)) defineProperty(
         proto,
         name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase()),
         {
           configurable: true,
-          get() {
-            return this.getAttribute(name);
-          },
-          set(value) {
-            if (value == null)
-              this.removeAttribute(name);
-            else
-              this.setAttribute(name, value);
-          }
+          get() { return this.getAttribute(name); },
+          set(value) { this.setAttribute(name, value); }
         }
       );
     });
 
-    // if these are defined, overwrite the observedAttributes getter
-    // to include also booleanAttributes
-    const attributes = booleanAttributes.concat(observedAttributes);
-    if (attributes.length)
-      defineProperty(Class, 'observedAttributes', {
-        get() { return attributes; }
-      });
+    const onChanged = proto.attributeChangedCallback;
+    const hasChange = !!onChanged;
 
-    // created() {}
-    // ---------------------------------
-    // an initializer method that grants
+    // created() {} is an initializer method that grants
     // the node is fully known to the browser.
     // It is ensured to run either after DOMContentLoaded,
     // or once there is a next sibling (stream-friendly) so that
@@ -3113,32 +3096,17 @@ class HyperHTMLElement extends HTMLElement {
         }
       );
 
-      // allow arbitrary invoke of `el.created()`
-      // handy to monkey patch old Firefox or others
-      defineProperty(
-        proto,
-        'created',
-        {
-          value() {
-            if (this._init$)
-              checkReady.call(this, created);
-          }
-        }
-      );
-
       // ⚠️ if you need to overwrite/change attributeChangedCallback method
       //    at runtime after class definition, be sure you do so
       //    via Object.defineProperty to preserve its non-enumerable nature.
       defineProperty(
         proto,
-        ATTRIBUTE_CHANGED_CALLBACK,
+        'attributeChangedCallback',
         {
           configurable: true,
-          value: function aCC(name, prev, curr) {
+          value(name, prev, curr) {
             if (this._init$) {
               checkReady.call(this, created);
-              if (this._init$)
-                return this._init$$.push(aCC.bind(this, name, prev, curr));
             }
             // ensure setting same value twice
             // won't trigger twice attributeChangedCallback
@@ -3159,11 +3127,9 @@ class HyperHTMLElement extends HTMLElement {
         'connectedCallback',
         {
           configurable: true,
-          value: function cC() {
+          value() {
             if (this._init$) {
               checkReady.call(this, created);
-              if (this._init$)
-                return this._init$$.push(cC.bind(this));
             }
             if (hasConnect) {
               onConnected.apply(this, arguments);
@@ -3177,7 +3143,7 @@ class HyperHTMLElement extends HTMLElement {
       //    via Object.defineProperty to preserve its non-enumerable nature.
       defineProperty(
         proto,
-        ATTRIBUTE_CHANGED_CALLBACK,
+        'attributeChangedCallback',
         {
           configurable: true,
           value(name, prev, curr) {
@@ -3346,42 +3312,30 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = HyperHTMLE
 // DOMContentLoaded VS created() //
 // ------------------------------//
 const dom = {
-  type: 'DOMContentLoaded',
-  handleEvent() {
-    if (dom.ready()) {
-      document.removeEventListener(dom.type, dom, false);
-      dom.list.splice(0).forEach(invoke);
+  handleEvent: function (e) {
+    if (dom.ready) {
+      document.removeEventListener(e.type, dom, false);
+      dom.list.splice(0).forEach(function (fn) { fn(); });
     }
-    else
-      setTimeout(dom.handleEvent);
   },
-  ready() {
+  get ready() {
     return document.readyState === 'complete';
   },
   list: []
 };
 
-if (!dom.ready()) {
-  document.addEventListener(dom.type, dom, false);
+if (!dom.ready) {
+  document.addEventListener('DOMContentLoaded', dom, false);
 }
 
 function checkReady(created) {
-  if (dom.ready() || isReady.call(this, created)) {
+  if (dom.ready || isReady.call(this, created)) {
     if (this._init$) {
-      const list = this._init$$;
-      if (list) delete this._init$$;
       created.call(defineProperty(this, '_init$', {value: false}));
-      if (list) list.forEach(invoke);
     }
   } else {
-    if (!this.hasOwnProperty('_init$$'))
-      defineProperty(this, '_init$$', {configurable: true, value: []});
     dom.list.push(checkReady.bind(this, created));
   }
-}
-
-function invoke(fn) {
-  fn();
 }
 
 function isPrototypeOf(Class) {
