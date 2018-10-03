@@ -59,11 +59,6 @@ io-list-box [role="listbox"] {
   margin-bottom: -1px;
   border: 1px solid #9b9b9b; }
 
-io-list-box [role="option"][aria-disabled="true"],
-io-list-box [role="option"][aria-disabled="true"].hover {
-  background: #eee;
-  cursor: default; }
-
 io-list-box [role="option"].hover {
   background: #e1f2fa; }
 
@@ -72,6 +67,11 @@ io-list-box [role="option"][aria-selected="true"] {
   background-repeat: no-repeat;
   background-position: 8px center;
   background-size: 20px 20px; }
+
+io-list-box [role="option"][aria-disabled="true"],
+io-list-box [role="option"][aria-disabled="true"].hover {
+  background: #eee;
+  cursor: default; }
 
 html[dir="rtl"] io-list-box [role="option"][aria-selected="true"] {
   background-position: calc(100% - 8px) center; }

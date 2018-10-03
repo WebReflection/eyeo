@@ -15,9 +15,81 @@
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-toggle {
+  --width: 30px;
+  --height: 8px;
+  --translateY: -4px;
+  --translateX: 14px;
+  display: inline-block;
+  width: var(--width);
+  height: var(--height);
+  border-radius: 4px;
+  background-color: #9b9b9b;
+  cursor: pointer;
+  transition: background 0.2s ease-out;
+  transform: translateY(calc(var(--translateY) * -1));
+  will-change: background; }
+
+html[dir="rtl"] io-toggle {
+  --translateX: -14px; }
+
+io-toggle[checked] {
+  background-color: #92d3ea; }
+
+io-toggle[disabled] {
+  opacity: 0.5;
+  cursor: default; }
+
+io-toggle button {
+  width: calc(var(--height) * 2);
+  height: calc(var(--height) * 2);
+  padding: 0;
+  border: 2px solid #e1e0e1;
+  border-radius: var(--height);
+  outline: none;
+  cursor: pointer;
+  transition: border 0.2s ease-out, box-shadow 0.2s ease-out, transform 0.2s ease-out, width 0.2s ease-out;
+  transform: translateY(var(--translateY));
+  will-change: border, box-shadow, transform, width; }
+
+io-toggle button[aria-checked="false"] {
+  background-color: #f1f1f1;
+  box-shadow: 0 1px 2px 0 #e5d1d1; }
+
+io-toggle button[aria-checked="false"]:hover {
+  box-shadow: 0 2px 4px 0 #d3b0b0; }
+
+io-toggle button[aria-checked="true"] {
+  border: 2px solid #059cd0;
+  background-color: #059cd0;
+  box-shadow: 0 1px 2px 0 #a6cede;
+  transform: translateY(var(--translateY)) translateX(var(--translateX)); }
+
+io-toggle button[aria-checked="true"]:hover {
+  box-shadow: 0 2px 4px 0 #a6cede; }
+
+io-toggle button:focus,
+io-toggle button[aria-checked="true"]:focus {
+  border: 2px solid #87bffe; }
+
 io-filter-list {
-  position: relative;
-  min-width: 500px;
+  width: 100%;
   padding: 0; }
 
 io-filter-list,
@@ -27,34 +99,36 @@ io-filter-list *::after {
   box-sizing: border-box; }
 
 io-filter-list table {
-  /* set as visible once populated */
-  visibility: hidden;
-  width: 100%;
-  border: 1px solid #9b9b9b;
   color: #505050;
   background-color: #fff; }
+
+io-filter-list table {
+  width: 100%;
+  border: 1px solid #bcbcbc;
+  user-select: none; }
 
 io-filter-list thead {
   user-select: none; }
 
-io-filter-list thead tr {
-  border-bottom: 1px solid #9b9b9b; }
+io-filter-list thead tr,
+io-filter-list td {
+  border-bottom: 1px solid #bcbcbc; }
 
-io-filter-list table.visible {
-  visibility: visible; }
+io-filter-list tr.empty td,
+io-filter-list tr:last-child td {
+  border-bottom: 0; }
 
 /* necessary to have scrollable tbody */
-io-filter-list thead tr,
+io-filter-list thead,
 io-filter-list tbody {
   display: block; }
 
-/* will show text either left or right instead of center */
-io-filter-list thead th {
-  font-weight: 400; }
+io-filter-list tr {
+  display: flex; }
 
 io-filter-list tbody {
   overflow: hidden;
-  max-height: 200px; }
+  height: 300px; }
 
 io-filter-list th,
 io-filter-list td {
@@ -62,31 +136,29 @@ io-filter-list td {
   padding: 4px 8px;
   text-align: center; }
 
-html:not([dir="rtl"]) io-filter-list td:last-child {
-  padding-right: 16px; }
+io-filter-list th {
+  padding: 8px;
+  cursor: pointer; }
 
 io-filter-list tbody tr {
-  height: var(--row-height, auto); }
-
-io-filter-list thead,
-io-filter-list tbody tr.odd {
-  background-color: #f1f1f1; }
-
-io-filter-list td {
+  height: var(--row-height, auto);
   outline: none; }
 
-io-filter-list [data-info="status"] {
-  width: var(--width-status, auto); }
+io-filter-list tbody tr.odd.selected,
+io-filter-list tbody tr.selected {
+  background-color: #f6f6f6; }
 
 io-filter-list [data-info="rule"] {
-  overflow: hidden;
-  width: var(--width-rule, auto);
-  max-width: var(--width-rule, auto);
+  width: var(--rule-width, auto);
   white-space: nowrap;
+  flex-grow: 1; }
+
+io-filter-list [data-info="rule"] .content {
+  overflow: hidden;
   text-overflow: ellipsis; }
 
-io-filter-list [data-info="rule"]:focus {
-  white-space: initial; }
+io-filter-list [data-info="rule"] .content:focus {
+  text-overflow: initial; }
 
 io-filter-list tr.invalid {
   background-color: #f1d1d1; }
@@ -94,69 +166,70 @@ io-filter-list tr.invalid {
 io-filter-list tr.invalid [data-info="rule"] {
   color: #c11d26; }
 
-html:not([dir="rtl"]) io-filter-list [data-info="rule"] {
+html:not([dir="rtl"]) io-filter-list [data-info="rule"],
+html:not([dir="rtl"]) io-filter-list [data-info="status"] {
   text-align: left; }
 
-html[dir="rtl"] io-filter-list [data-info="rule"] {
+html[dir="rtl"] io-filter-list [data-info="rule"],
+html[dir="rtl"] io-filter-list [data-info="status"] {
   text-align: right; }
 
+io-filter-list [data-info="status"],
+io-filter-list [data-info="selected"],
 io-filter-list [data-info="warning"] {
-  width: var(--width-warning, auto); }
-
-io-filter-list [data-info="hits"] {
-  width: var(--width-hits, auto); }
-
-io-filter-list [data-info="remove"] {
-  width: var(--width-remove, auto); }
-
-io-filter-list [data-info="warning"] {
-  padding: 0; }
+  width: 72px; }
 
 io-filter-list [data-info="warning"] img {
-  width: 80%;
-  margin: auto; }
+  width: 1em;
+  height: 1em; }
 
-io-filter-list [data-info="remove"] button {
-  display: block;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  background-color: transparent;
-  background-image: url(icons/trash.svg?default#default);
-  background-repeat: none;
-  background-position: center;
-  background-size: contain; }
-
-io-filter-list [data-info="remove"] button:hover {
-  background-image: url(icons/trash.svg?hover#hover); }
+io-filter-list td[data-info="warning"] img {
+  opacity: 0.5; }
 
 io-filter-list thead th::after {
   display: inline-block;
   visibility: hidden;
   position: absolute;
   padding: 4px;
-  font-size: 8px; }
+  font-size: 8px;
+  line-height: 1em; }
 
 io-filter-list thead[data-dir="asc"] th::after {
-  content: "▼"; }
+  content: "▲"; }
 
 io-filter-list thead[data-dir="desc"] th::after {
-  content: "▲"; }
+  content: "▼"; }
 
 io-filter-list thead[data-sort="status"] th[data-info="status"]::after,
 io-filter-list thead[data-sort="rule"] th[data-info="rule"]::after,
-io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after,
-io-filter-list thead[data-sort="hits"] th[data-info="hits"]::after {
+io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after {
   visibility: visible; }
 
-io-filter-list > io-scrollbar {
+io-filter-list table {
+  position: relative; }
+
+io-filter-list io-scrollbar {
   position: absolute;
-  top: 29px;
-  bottom: 0; }
+  top: 46px;
+  bottom: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease-in; }
 
-html:not([dir="rtl"]) io-filter-list > io-scrollbar {
-  right: 0; }
+io-filter-list:hover io-scrollbar {
+  opacity: 1; }
 
-html[dir="rtl"] io-filter-list > io-scrollbar {
-  left: 0; }
+html:not([dir="rtl"]) io-filter-list io-scrollbar {
+  right: 12px; }
+
+html[dir="rtl"] io-filter-list io-scrollbar {
+  left: 12px; }
+
+io-filter-list io-toggle {
+  margin-top: 2px;
+  vertical-align: top; }
+
+html:not([dir="rtl"]) io-filter-list io-toggle {
+  margin-right: 8px; }
+
+html[dir="rtl"] io-filter-list io-toggle {
+  margin-left: 8px; }

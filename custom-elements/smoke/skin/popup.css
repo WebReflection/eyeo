@@ -151,6 +151,10 @@ io-big-toggle[refresh] button > span {
 *::after {
   box-sizing: border-box; }
 
+[hidden],
+[aria-hidden="true"] {
+  display: none !important; }
+
 html,
 body,
 h1,
@@ -159,7 +163,8 @@ h2 {
 
 body.nohtml #block-element,
 body.disabled #stats-page,
-body.ignore #page-info {
+body.ignore #page-status,
+body.ignore #default-container .options {
   display: none; }
 
 html,
@@ -176,8 +181,8 @@ body {
 button {
   border: 0;
   color: var(--color-link);
-  cursor: pointer;
-  appearance: none; }
+  background: none;
+  cursor: pointer; }
 
 button[disabled] {
   cursor: default; }
@@ -213,6 +218,7 @@ html[dir="rtl"] header h1 {
   background-position: right center; }
 
 header .notification::before {
+  --border-top-color: var(--border-color-primary);
   display: block;
   overflow: hidden;
   height: var(--border-width-thick-doubled);
@@ -245,6 +251,9 @@ header .notification {
 header .notification > div {
   padding: var(--padding-primary); }
 
+header .notification h3[hidden] + p {
+  margin-top: 0; }
+
 header .notification h3 {
   margin: 0;
   color: var(--color-secondary);
@@ -260,16 +269,20 @@ header .notification h3::before {
   background-size: 16px;
   content: ""; }
 
-html:not([dir="rtl"]) header .notification h3 {
+html:not([dir="rtl"]) header .notification.critical h3,
+html:not([dir="rtl"]) header .notification.information h3 {
   padding-left: 24px; }
 
-html:not([dir="rtl"]) header .notification h3::before {
+html:not([dir="rtl"]) header .notification.critical h3::before,
+html:not([dir="rtl"]) header .notification.information h3::before {
   margin-left: -24px; }
 
-html[dir="rtl"] header .notification h3 {
+html[dir="rtl"] header .notification.critical h3,
+html[dir="rtl"] header .notification.information h3 {
   padding-right: 24px; }
 
-html[dir="rtl"] header .notification h3::before {
+html[dir="rtl"] header .notification.critical h3::before,
+html[dir="rtl"] header .notification.information h3::before {
   margin-right: -24px; }
 
 header .notification.critical h3::before {
@@ -289,9 +302,8 @@ header .notification button {
   padding-left: 0;
   font-size: var(--font-size-primary); }
 
-header .notification hr + button {
-  margin-top: var(--margin-primary-half);
-  margin-bottom: var(--margin-primary-half); }
+header .notification button {
+  margin-top: var(--margin-primary-half); }
 
 #options {
   min-width: var(--font-size-big);
@@ -301,7 +313,7 @@ header .notification hr + button {
   background-repeat: no-repeat;
   background-position: center;
   background-size: var(--font-size-big);
-  transition: opacity 0.3s ease-in; }
+  transition: opacity 0.1s ease-in; }
 
 #options:hover {
   opacity: 1; }
@@ -463,6 +475,13 @@ main .options button[disabled] {
 main .options button:not([disabled]):hover .report::before {
   background-image: url(icons/report-issue.svg?hover#hover); }
 
+/* creates a gap between bold numbers and text (both rtl and ltr) */
+#stats-page strong::after,
+#stats-total strong::after {
+  display: inline-block;
+  margin: 4px;
+  content: ""; }
+
 body:not(.disabled) main .options button:hover .block::before {
   background-image: url(icons/block-element.svg?hover#hover); }
 
@@ -485,13 +504,14 @@ footer > span {
   flex-grow: 1; }
 
 footer > button {
+  width: var(--font-size-primary);
   margin-right: var(--margin-primary-half);
   margin-left: var(--margin-primary-half);
   opacity: 0.5;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: var(--font-size-primary);
-  transition: opacity 0.3s ease-in; }
+  background-size: contain;
+  transition: opacity 0.1s ease-in; }
 
 footer > button:hover {
   opacity: 1; }

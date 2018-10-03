@@ -7,5 +7,8 @@
   },
   "options_filter_list_hits": {
     "message": "Hits"
+  },
+  "options_filterList_column_status": {
+    "message": "Status"
   }
 }

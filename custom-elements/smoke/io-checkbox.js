@@ -18,69 +18,56 @@
 
 "use strict";
 
-module.exports = {
-  $: (selector, container = document) => container.querySelector(selector),
-  $$: (selector, container = document) => container.querySelectorAll(selector),
+const IOElement = require("./io-element");
 
-  // basic copy and paste clipboard utility
-  clipboard: {
-    // warning: Firefox needs a proper event to work
-    //          such click or mousedown or similar.
-    copy(text)
-    {
-      const selection = document.getSelection();
-      const selected = selection.rangeCount > 0 ?
-                        selection.getRangeAt(0) : null;
-      const el = document.createElement("textarea");
-      el.value = text;
-      el.setAttribute("readonly", "");
-      el.style.cssText = "position:fixed;top:-999px";
-      document.body.appendChild(el).select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      if (selected)
-      {
-        selection.removeAllRanges();
-        // simply putting back selected doesn't work anymore
-        const range = document.createRange();
-        range.setStart(selected.startContainer, selected.startOffset);
-        range.setEnd(selected.endContainer, selected.endOffset);
-        selection.addRange(range);
-      }
-    },
-    // optionally accepts a `paste` DOM event
-    // it uses global clipboardData, if available, otherwise.
-    // i.e. input.onpaste = event => console.log(dom.clipboard.paste(event));
-    paste(event)
-    {
-      if (!event)
-        event = window;
-      const clipboardData = event.clipboardData || window.clipboardData;
-      return clipboardData ? clipboardData.getData("text") : "";
-    }
-  },
-
-  // helper to provide the relative coordinates
-  // to the closest positioned containing element
-  relativeCoordinates(event)
+class IOCheckbox extends IOElement
+{
+  static get booleanAttributes()
   {
-    let el = event.currentTarget;
-    let x = 0;
-    let y = 0;
-    do
-    {
-      x += el.offsetLeft - el.scrollLeft;
-      y += el.offsetTop - el.scrollTop;
-    } while (
-      (el = el.offsetParent) &&
-      !isNaN(el.offsetLeft) &&
-      !isNaN(el.offsetTop)
-    );
-    return {x: event.pageX - x, y: event.pageY - y};
+    return ["checked", "disabled"];
   }
-};
 
-},{}],2:[function(require,module,exports){
+  attributeChangedCallback()
+  {
+    this.render();
+  }
+
+  created()
+  {
+    this.addEventListener("click", this);
+    this.render();
+  }
+
+  onclick(event)
+  {
+    if (this.disabled)
+    {
+      this.checked = !this.checked;
+      this.dispatchEvent(new CustomEvent("change", {
+        bubbles: true,
+        cancelable: true,
+        detail: this.checked
+      }));
+    }
+  }
+
+  render()
+  {
+    this.html`
+    <button
+      role="checkbox"
+      disabled="${this.disabled}"
+      aria-checked="${this.checked}"
+      aria-disabled="${this.disabled}"
+    />`;
+  }
+}
+
+IOCheckbox.define("io-checkbox");
+
+module.exports = IOCheckbox;
+
+},{"./io-element":2}],2:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -239,261 +226,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":4,"hyperhtml-element/cjs":5}],3:[function(require,module,exports){
-/*
- * This file is part of Adblock Plus <https://adblockplus.org/>,
- * Copyright (C) 2006-present eyeo GmbH
- *
- * Adblock Plus is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
- *
- * Adblock Plus is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-"use strict";
-
-const IOElement = require("./io-element");
-
-const {$} = require("./dom");
-
-// this component simply emits filter:add(text)
-// and filter:match({accuracy, filter}) events
-class IOFilterSearch extends IOElement
-{
-  static get booleanAttributes()
-  {
-    return ["disabled"];
-  }
-
-  static get observedAttributes()
-  {
-    return ["match"];
-  }
-
-  get defaultState()
-  {
-    return {
-      filterExists: true,
-      filters: [],
-      match: -1
-    };
-  }
-
-  get filters()
-  {
-    return this.state.filters;
-  }
-
-  // filters are never modified or copied
-  // but used to find out if one could be added
-  // or if the component in charge should show the found one
-  set filters(value)
-  {
-    this.setState({filters: value || []});
-  }
-
-  get match()
-  {
-    return this.state.match;
-  }
-
-  // match is a number between -1 and 1
-  // -1 means any match
-  // 1 means exact match
-  // 0 means match disabled => no filter:match event ever
-  set match(value)
-  {
-    this.setState({
-      match: Math.max(-1, Math.min(1, parseFloat(value) || 0))
-    }, false);
-  }
-
-  get value()
-  {
-    return $("input", this).value.trim();
-  }
-
-  set value(text)
-  {
-    const value = String(text || "").trim();
-    $("input", this).value = value;
-    this.setState({
-      filterExists: value.length ?
-                      this.state.filters.some(hasValue, value) :
-                      false
-    });
-  }
-
-  attributeChangedCallback(name, previous, current)
-  {
-    if (name === "match")
-      this.match = current;
-    else
-      this.render();
-  }
-
-  created()
-  {
-    const {i18n} = browser;
-    this._placeholder = i18n.getMessage("options_filters_search_or_add");
-    this._timer = 0;
-    this.render();
-  }
-
-  onclick()
-  {
-    if (this.value)
-      dispatch.call(this, "filter:add", this.value);
-  }
-
-  ondrop(event)
-  {
-    event.preventDefault();
-    addFilter.call(this, event.dataTransfer.getData("text"));
-  }
-
-  onkeydown(event)
-  {
-    switch (event.key)
-    {
-      case "Enter":
-        const {value} = this;
-        if (
-          value.length &&
-          !this.disabled &&
-          !this.state.filters.some(hasValue, value)
-        )
-          addFilter.call(this, value);
-        break;
-      case "Escape":
-        this.value = "";
-        break;
-    }
-  }
-
-  onkeyup()
-  {
-    const {match, value} = this;
-    // no match means don't validate
-    // but also multi line (paste on old browsers)
-    // shouldn't pass through this logic (filtered later on)
-    if (!match || !value || value.includes("\n"))
-      return;
-    clearTimeout(this._timer);
-    // debounce the search to avoid degrading
-    // performance on very long list of filters
-    this._timer = setTimeout(() =>
-    {
-      this._timer = 0;
-      const result = search.call(this, value);
-      if (result.accuracy && match <= result.accuracy)
-        dispatch.call(this, "filter:match", result);
-    }, 100);
-  }
-
-  onpaste(event)
-  {
-    const clipboardData = event.clipboardData || window.clipboardData;
-    addFilter.call(this, clipboardData.getData("text"));
-  }
-
-  render()
-  {
-    const {disabled} = this;
-    this.html`
-    <input
-      placeholder="${this._placeholder}"
-      onkeydown="${this}" onkeyup="${this}"
-      ondrop="${this}" onpaste="${this}"
-      disabled="${disabled}"
-    >
-    <button
-      onclick="${this}"
-      disabled="${disabled || this.state.filterExists || !this.value}">
-      + ${{i18n: "add"}}
-    </button>`;
-  }
-}
-
-IOFilterSearch.define("io-filter-search");
-
-module.exports = IOFilterSearch;
-
-function addFilter(data)
-{
-  const value = data.trim();
-  if (!value)
-    return;
-  const result = search.call(this, value);
-  if (result.accuracy < 1)
-    dispatch.call(this, "filter:add", value);
-  else if (result.accuracy)
-    dispatch.call(this, "filter:match", result);
-}
-
-function dispatch(type, detail)
-{
-  this.dispatchEvent(new CustomEvent(type, {detail}));
-}
-
-function hasValue(filter)
-{
-  return filter.text == this;
-}
-
-function search(value)
-{
-  let accuracy = 0;
-  let closerFilter = null;
-  const searchLength = value.length;
-  if (searchLength)
-  {
-    const match = this.match;
-    const {filters} = this.state;
-    const {length} = filters;
-    for (let i = 0; i < length; i++)
-    {
-      const filter = filters[i];
-      const filterLength = filter.text.length;
-      // ignore all filters shorter than current search
-      if (searchLength > filterLength)
-        continue;
-      // compare the two strings only if length is the same
-      if (searchLength === filterLength)
-      {
-        if (filter.text === value)
-        {
-          closerFilter = filter;
-          accuracy = 1;
-          break;
-        }
-        continue;
-      }
-      // otherwise verify text includes searched value
-      // only if the match is not meant to be 1:1
-      if (match < 1 && filter.text.includes(value))
-      {
-        const tmpAccuracy = searchLength / filterLength;
-        if (accuracy < tmpAccuracy)
-        {
-          closerFilter = filter;
-          accuracy = tmpAccuracy;
-        }
-      }
-    }
-    this.setState({filterExists: accuracy === 1});
-  }
-  return {accuracy, filter: closerFilter};
-}
-
-},{"./dom":1,"./io-element":2}],4:[function(require,module,exports){
+},{"document-register-element/pony":3,"hyperhtml-element/cjs":4}],3:[function(require,module,exports){
 /*!
 ISC License
 
@@ -2001,7 +1734,7 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],5:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 'use strict';
 /*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
@@ -2364,7 +2097,7 @@ function isReady(created) {
   return false;
 }
 
-},{"hyperhtml/cjs":12}],6:[function(require,module,exports){
+},{"hyperhtml/cjs":11}],5:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 /*! (c) 2018 Andrea Giammarchi (ISC) */
@@ -2589,7 +2322,7 @@ const domdiff = (
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
 
-},{"./utils.js":7}],7:[function(require,module,exports){
+},{"./utils.js":6}],6:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 const append = (get, parent, children, start, end, before) => {
@@ -2987,7 +2720,7 @@ const smartDiff = (
 };
 exports.smartDiff = smartDiff;
 
-},{}],8:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 'use strict';
 const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
@@ -3144,7 +2877,7 @@ const setValue = (self, secret, value) =>
   })[secret]
 ;
 
-},{"../shared/poorlyfills.js":20}],9:[function(require,module,exports){
+},{"../shared/poorlyfills.js":19}],8:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -3179,7 +2912,7 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":18,"../shared/utils.js":22}],10:[function(require,module,exports){
+},{"../shared/easy-dom.js":17,"../shared/utils.js":21}],9:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
 const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
@@ -3261,7 +2994,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":16,"../shared/constants.js":17,"../shared/poorlyfills.js":20,"../shared/re.js":21,"../shared/utils.js":22}],11:[function(require,module,exports){
+},{"../objects/Updates.js":15,"../shared/constants.js":16,"../shared/poorlyfills.js":19,"../shared/re.js":20,"../shared/utils.js":21}],10:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -3361,7 +3094,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":9,"../shared/constants.js":17,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./render.js":10}],12:[function(require,module,exports){
+},{"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/easy-dom.js":17,"../shared/poorlyfills.js":19,"../shared/utils.js":21,"./render.js":9}],11:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -3423,7 +3156,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./3rd/domdiff.js":6,"./classes/Component.js":8,"./hyper/render.js":10,"./hyper/wire.js":11,"./objects/Intent.js":13}],13:[function(require,module,exports){
+},{"./3rd/domdiff.js":5,"./classes/Component.js":7,"./hyper/render.js":9,"./hyper/wire.js":10,"./objects/Intent.js":12}],12:[function(require,module,exports){
 'use strict';
 const attributes = {};
 const intents = {};
@@ -3465,7 +3198,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],14:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -3525,7 +3258,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":17}],15:[function(require,module,exports){
+},{"../shared/constants.js":16}],14:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -3608,7 +3341,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],16:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -4132,7 +3865,7 @@ function observe() {
   }
 }
 
-},{"../3rd/domdiff.js":6,"../classes/Component.js":8,"../classes/Wire.js":9,"../shared/constants.js":17,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./Intent.js":13,"./Path.js":14,"./Style.js":15}],17:[function(require,module,exports){
+},{"../3rd/domdiff.js":5,"../classes/Component.js":7,"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/easy-dom.js":17,"../shared/poorlyfills.js":19,"../shared/utils.js":21,"./Intent.js":12,"./Path.js":13,"./Style.js":14}],16:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -4177,7 +3910,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],18:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -4189,7 +3922,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],19:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -4216,7 +3949,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":18}],20:[function(require,module,exports){
+},{"./easy-dom.js":17}],19:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -4290,7 +4023,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":17}],21:[function(require,module,exports){
+},{"./constants.js":16}],20:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -4315,7 +4048,7 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],22:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
@@ -4524,32 +4257,9 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":17,"./easy-dom.js":18,"./features-detection.js":19,"./poorlyfills.js":20,"./re.js":21}],23:[function(require,module,exports){
+},{"./constants.js":16,"./easy-dom.js":17,"./features-detection.js":18,"./poorlyfills.js":19,"./re.js":20}],22:[function(require,module,exports){
 "use strict";
 
-require("../js/io-filter-search");
+require("../js/io-checkbox");
 
-
-window.onload = () =>
-{
-  const ioFilterSearch = document.querySelector("io-filter-search");
-
-  ioFilterSearch.filters = [
-    {text: "a"},
-    {text: "ab"},
-    {text: "bcd"},
-    {text: "test"},
-    {text: "existent"}
-  ];
-
-  ioFilterSearch.addEventListener("filter:add", log);
-  ioFilterSearch.addEventListener("filter:match", log);
-
-  function log(event)
-  {
-    ioFilterSearch.nextElementSibling.textContent =
-      `${event.type.slice(7)}: ${JSON.stringify(event.detail)}`;
-  }
-};
-
-},{"../js/io-filter-search":3}]},{},[23]);
+},{"../js/io-checkbox":1}]},{},[22]);

@@ -226,6 +226,10 @@ body {
   font-size: 1.25rem;
   align-items: center; }
 
+input,
+button {
+  font-family: inherit; }
+
 header,
 main,
 footer {
@@ -291,13 +295,19 @@ main h1 {
   padding: 0;
   font-size: 1.5rem; }
 
-#typeSelectorGroup input[type="radio"] {
-  transform: translateY(2px); }
+#typeSelectorGroup {
+  font-size: 1rem; }
+
+#typeSelectorGroup > label {
+  font-weight: 700; }
 
 #typeSelectorGroup > p {
   margin-top: 0.5em;
   margin-bottom: 1em;
-  font-size: 80%; }
+  font-size: 0.9rem; }
+
+#typeSelectorGroup > p:first-of-type {
+  margin-bottom: 30px; }
 
 html:not([dir="rtl"]) #typeSelectorGroup > p {
   margin-left: 30px; }
@@ -310,9 +320,9 @@ html[dir="rtl"] #typeSelectorGroup > p {
 
 #anonymousSubmissionWarning,
 #error {
-  margin-top: 0.5em;
-  color: #C00000;
-  font-size: 80%; }
+  margin-top: 0.3em;
+  margin-bottom: 1em;
+  color: #C00000; }
 
 #comment {
   min-height: 2em;
@@ -342,13 +352,19 @@ footer {
   display: flex;
   flex-direction: row;
   box-sizing: border-box;
-  margin-top: 2rem; }
+  margin-top: 2rem;
+  padding-bottom: 16px; }
+
+footer > div {
+  flex-grow: 1;
+  align-self: flex-end; }
 
 #privacyPolicy {
-  font-size: 1.125rem;
-  font-weight: 700;
-  flex-grow: 1;
-  align-self: center; }
+  font-size: 1rem; }
+
+#privacyPolicy,
+#privacyPolicy:visited {
+  color: #077ca7; }
 
 /*
  * Generic styles
@@ -363,7 +379,8 @@ button {
   font-weight: 700;
   text-decoration: none;
   text-transform: uppercase;
-  cursor: pointer; }
+  cursor: pointer;
+  flex-shrink: 0; }
 
 html:not([dir="rtl"]) button {
   margin-left: 0.5rem; }
@@ -374,7 +391,7 @@ html[dir="rtl"] button {
 button.primary:not(.icon) {
   border: 0px;
   color: #FFF;
-  background-color: #099CD0; }
+  background-color: #077ca7; }
 
 button.primary:not([disabled]):not(.icon):hover {
   box-shadow: inset 0 0 0 3px #005D80; }
@@ -383,18 +400,17 @@ button.primary[disabled]:not(.icon) {
   background-color: #5CBCE1; }
 
 button.secondary {
-  border: 1px solid #099CD0;
-  color: #099CD0; }
+  border: 1px solid #077ca7;
+  color: #077ca7; }
 
 button.secondary:hover {
-  box-shadow: inset 0 0 0 2px #099CD0; }
+  box-shadow: inset 0 0 0 2px #077ca7; }
 
 button.link {
   padding: 0.2rem;
   border: 0px;
   color: #077CA6;
   background-color: transparent;
-  font-family: inherit;
   font-weight: 400;
   text-decoration: underline;
   text-transform: none; }
@@ -410,7 +426,7 @@ button.link:disabled:hover {
 input[type="text"],
 input[type="email"],
 textarea {
-  border: 2px solid #099CD0;
+  border: 2px solid #077ca7;
   font-size: 1.25rem; }
 
 input[type="email"]:invalid {
@@ -507,3 +523,14 @@ input[type="radio"]:checked {
 
 body[data-page="commentPage"] #continue {
   display: none; }
+
+#commentPage > label {
+  font-size: 1rem;
+  font-weight: 700; }
+
+#anonymousSubmissionContainer {
+  font-size: 0.9rem; }
+
+#typeSelectorGroup input[type="radio"],
+#anonymousSubmission {
+  vertical-align: top; }

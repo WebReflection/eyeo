@@ -25,6 +25,7 @@ const $$ = (selector, container = document) =>
 
 module.exports = {
   $: (selector, container = document) => container.querySelector(selector),
+
   // while Symbol.iterator is needed for for/of loops
   // the forEach method was introduced after and it's handy
   // in some circumstance, hence a better check, without the need
@@ -32,6 +33,45 @@ module.exports = {
   $$: "forEach" in NodeList.prototype ?
       $$ :
       (selector, container = document) => slice.call($$(selector, container)),
+
+  // basic copy and paste clipboard utility
+  clipboard: {
+    // warning: Firefox needs a proper event to work
+    //          such click or mousedown or similar.
+    copy(text)
+    {
+      const selection = document.getSelection();
+      const selected = selection.rangeCount > 0 ?
+                        selection.getRangeAt(0) : null;
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.setAttribute("readonly", "");
+      el.style.cssText = "position:fixed;top:-999px";
+      document.body.appendChild(el).select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      if (selected)
+      {
+        selection.removeAllRanges();
+        // simply putting back selected doesn't work anymore
+        const range = document.createRange();
+        range.setStart(selected.startContainer, selected.startOffset);
+        range.setEnd(selected.endContainer, selected.endOffset);
+        selection.addRange(range);
+      }
+    },
+    // optionally accepts a `paste` DOM event
+    // it uses global clipboardData, if available, otherwise.
+    // i.e. input.onpaste = event => console.log(dom.clipboard.paste(event));
+    paste(event)
+    {
+      if (!event)
+        event = window;
+      const clipboardData = event.clipboardData || window.clipboardData;
+      return clipboardData ? clipboardData.getData("text") : "";
+    }
+  },
+
   // helper to provide the relative coordinates
   // to the closest positioned containing element
   relativeCoordinates(event)
@@ -211,7 +251,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":5,"hyperhtml-element/cjs":6}],3:[function(require,module,exports){
+},{"document-register-element/pony":6,"hyperhtml-element/cjs":7}],3:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -231,6 +271,8 @@ module.exports = IOElement;
 
 "use strict";
 
+require("./io-toggle");
+
 const IOElement = require("./io-element");
 const IOScrollbar = require("./io-scrollbar");
 const {utils, wire} = IOElement;
@@ -240,11 +282,21 @@ const {$, $$} = require("./dom");
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
 {
+  get selected()
+  {
+    return this._selected || (this._selected = new Set());
+  }
+
+  set selected(value)
+  {
+    this._selected = new Set(value);
+    this.render();
+  }
+
   get defaultState()
   {
     return {
       infinite: false,
-      contentEditable: false,
       filters: [],
       viewHeight: 0,
       rowHeight: 0,
@@ -252,16 +304,13 @@ class IOFilterList extends IOElement
       scrollHeight: 0,
       tbody: null,
       sort: {
-        status: false,
-        rule: false,
-        warning: false,
-        hits: false
+        current: "",
+        asc: false
       },
       sortMap: {
-        status: "enabled",
+        status: "disabled",
         rule: "text",
-        warning: "slow",
-        hits: "hits"
+        warning: "slow"
       }
     };
   }
@@ -279,7 +328,6 @@ class IOFilterList extends IOElement
   set disabled(value)
   {
     utils.boolean.attribute(this, "disabled", value);
-    this.setState({contentEditable: !this.disabled});
   }
 
   get filters()
@@ -289,27 +337,30 @@ class IOFilterList extends IOElement
 
   set filters(value)
   {
+    this.selected = [];
+    // clear any previous style rule
+    this.style.setProperty("--rule-width", "auto");
     // render one row only for the setup
     this.setState({
       infinite: false,
-      filters: value.slice(0, 1)
+      filters: []
     });
+    this.style.setProperty(
+      "--rule-width",
+      $('[data-info="rule"]', this).clientWidth + "px"
+    );
     // if filters have more than a row
     // prepare the table with a new state
     if (value.length)
     {
-      setupTable.call(this);
       const tbody = $("tbody", this);
       const rowHeight = $("tr", tbody).clientHeight;
       const viewHeight = tbody.clientHeight;
       this.setState({
         infinite: true,
-        contentEditable: !this.disabled,
-        // copied it to avoid surprises
-        filters: value.slice(),
+        filters: value,
         scrollTop: tbody.scrollTop,
-        // one day I will understand where those 7px come from
-        scrollHeight: rowHeight * value.length - viewHeight + 7,
+        scrollHeight: rowHeight * (value.length + 1) - viewHeight,
         viewHeight,
         rowHeight
       });
@@ -362,9 +413,12 @@ class IOFilterList extends IOElement
 
   scrollTo(row)
   {
-    const {rowHeight} = this.state;
+    const {rowHeight, scrollHeight} = this.state;
     this.setState({
-      scrollTop: this.filters.findIndex(filter => filter === row) * rowHeight
+      scrollTop: Math.min(
+        scrollHeight,
+        this.filters.findIndex(filter => filter === row) * rowHeight
+      )
     });
   }
 
@@ -376,25 +430,41 @@ class IOFilterList extends IOElement
     const {info} = th.dataset;
     if (info === "remove")
       return;
+    // avoid toggle passing through
+    if (info === "status" && this.selected.size)
+      return;
+    if (info === "selected")
+    {
+      this.selected = event.target.checked ? this.filters : [];
+      setHeaderToggle.call(this);
+      return;
+    }
     event.preventDefault();
     const {sort, sortMap} = this.state;
-    sort[info] = !sort[info];
-    const sorter = sort[info] ? 1 : -1;
+    if (info !== sort.current)
+    {
+      sort.current = info;
+      sort.asc = false;
+    }
+    sort.asc = !sort.asc;
+    const sorter = sort.asc ? 1 : -1;
     const property = sortMap[info];
+    const direction = property === "slow" ? -1 : 1;
     this.filters.sort((fa, fb) =>
     {
       if (fa[property] === fb[property])
         return 0;
-      return fa[property] < fb[property] ? -sorter : sorter;
+      return (fa[property] < fb[property] ? -sorter : sorter) * direction;
     });
     this.render();
-    th.closest("thead").dataset.sort = info;
-    th.closest("thead").dataset.dir = sort[info] ? "asc" : "desc";
+    const dataset = th.closest("thead").dataset;
+    dataset.sort = info;
+    dataset.dir = sort.asc ? "asc" : "desc";
   }
 
   onkeydown(event)
   {
-    if (event.key === " ")
+    if (event.key === "Enter")
       event.preventDefault();
   }
 
@@ -413,8 +483,8 @@ class IOFilterList extends IOElement
     currentTarget.closest("tr").classList.remove("invalid");
     if (update)
     {
-      const {rule} = currentTarget.dataset;
-      const filter = this.filters.find(item => item.text === rule);
+      const {title} = currentTarget;
+      const filter = this.filters.find(item => item.text === title);
       filter.text = text;
       dispatch.call(this, "update", filter);
       this.render();
@@ -426,62 +496,58 @@ class IOFilterList extends IOElement
     this.onkeyup(event);
   }
 
-  onrowclick(event)
+  onchange(event)
   {
-    if (
-      !utils.event.isLeftClick(event) ||
-      event.currentTarget.classList.contains("empty")
-    )
-      return;
-    const td = event.target.closest("td");
-    if (!td)
-      return;
-    const {info} = td.dataset;
-    const div = $('td[data-info="rule"] > [contenteditable]', td.parentNode);
+    const el = event.currentTarget;
+    const div = $('td[data-info="rule"] > .content', el.closest("tr"));
     const {textContent} = div;
-    const filter = this.filters.find(item => item.text === textContent);
-    if (info === "remove")
+    const {filters} = this;
+    const filter = filters.find(item => item.text === textContent);
+    switch (el.closest("td").dataset.info)
     {
-      dispatch.call(this, info, filter);
-      this.filters.splice(this.filters.indexOf(filter), 1);
-      updateScrollbar.call(this);
+      case "selected":
+        if (event.shiftKey && this.selected.size)
+        {
+          let start = filters.indexOf(this._lastFilter);
+          const end = filters.indexOf(filter);
+          const method = this.selected.has(this._lastFilter) ?
+                          "add" :
+                          "delete";
+          if (start < end)
+          {
+            while (start++ < end)
+              this.selected[method](filters[start]);
+          }
+          else
+          {
+            while (start-- > end)
+              this.selected[method](filters[start]);
+          }
+        }
+        else
+        {
+          this._lastFilter = filter;
+          if (this.selected.has(filter))
+            this.selected.delete(filter);
+          else
+            this.selected.add(filter);
+        }
+        setHeaderToggle.call(this);
+        break;
+      case "status":
+        filter.disabled = !filter.disabled;
+        break;
     }
-    else if (info === "status")
-    {
-      dispatch.call(this, filter.enabled ? "disable" : "enable", filter);
-      filter.enabled = !filter.enabled;
-      this.render();
-    }
+    this.render();
   }
 
-  render()
+  onmousedown(event)
   {
-    let list = this.state.filters;
-    if (this.state.infinite)
-    {
-      list = [];
-      const {rowHeight, scrollTop, viewHeight} = this.state;
-      const length = this.state.filters.length;
-      let count = 0;
-      let i = Math.max(0, Math.floor(scrollTop / rowHeight));
-      this._stripes = i % 2;
-      // always add an extra row to make scrolling smooth
-      while ((count * rowHeight) < (viewHeight + rowHeight))
-      {
-        list[count++] = i < length ? this.state.filters[i++] : null;
-      }
-    }
-    this.html`<table cellpadding="0" cellspacing="0">
-      <thead onclick="${this}" data-call="onheaderclick">
-        <th data-info="status">${{i18n: "options_filter_list_status"}}</th>
-        <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
-        <th data-info="warning">!</th>
-        <th data-info="hits">${{i18n: "options_filter_list_hits"}}</th>
-        <th data-info="remove"></th>
-      </thead>
-      <tbody>${list.map(getRow, this)}</tbody>
-    </table>
-    ${this.scrollbar}`;
+    $(".content", event.currentTarget).focus();
+  }
+
+  postRender(list)
+  {
     const {tbody, scrollTop, rowHeight} = this.state;
     if (this.state.infinite)
     {
@@ -496,6 +562,50 @@ class IOFilterList extends IOElement
       });
     }
   }
+
+  render()
+  {
+    let list = this.state.filters;
+    if (this.state.infinite)
+    {
+      list = [];
+      const {rowHeight, scrollTop, viewHeight} = this.state;
+      const length = this.state.filters.length;
+      let count = 0;
+      let i = Math.max(0, Math.floor(scrollTop / rowHeight));
+      // always add an extra row to make scrolling smooth
+      while ((count * rowHeight) < (viewHeight + rowHeight))
+      {
+        list[count++] = i < length ? this.state.filters[i++] : null;
+      }
+    }
+    this.html`<table cellpadding="0" cellspacing="0">
+      <thead onclick="${this}" data-call="onheaderclick">
+        <th data-info="selected"><input type="checkbox"></th>
+        <th data-info="status">
+          <io-toggle disabled="true" onchange="${onHeaderToggleChange}" />
+        </th>
+        <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
+        <th data-info="warning">${
+          // for the header, just return always the same warning icon
+          warnings.get(this) || createWarning(this)
+        }</th>
+      </thead>
+      <tbody>${list.map(getRow, this)}</tbody>
+      ${this.scrollbar}
+    </table>`;
+    this.postRender(list);
+  }
+
+  updateScrollbar()
+  {
+    const {rowHeight, viewHeight} = this.state;
+    const {length} = this.filters;
+    this.scrollbar.size = rowHeight * length;
+    this.setState({
+      scrollHeight: rowHeight * (length + 1) - viewHeight
+    });
+  }
 }
 
 IOFilterList.define("io-filter-list");
@@ -504,21 +614,26 @@ module.exports = IOFilterList;
 
 // Please note: the contenteditable=${...} attribute
 // cannot be set directly to the TD because of an ugly
-// MS Edge b ug that does not allow TDs to be editable.
+// MS Edge bug that does not allow TDs to be editable.
 function getRow(filter, i)
 {
-  const className = ((this._stripes + i) % 2) ? "odd" : "even";
-  const {contentEditable} = this.state;
   if (filter)
+  {
+    const selected = this.selected.has(filter);
     return wire(filter)`
-    <tr class="${className}" onclick="${this}" data-call="onrowclick">
-      <td data-info="status">
-        <input type="checkbox" checked="${filter.enabled}">
+    <tr class="${selected ? "selected" : ""}">
+      <td data-info="selected">
+        <input type="checkbox" checked="${selected}"
+                onclick="${this}" data-call="onchange">
       </td>
-      <td data-info="rule">
+      <td data-info="status">
+        <io-toggle checked="${!filter.disabled}" onchange="${this}" />
+      </td>
+      <td data-info="rule" onmousedown="${this}">
         <div
-          contenteditable="${contentEditable}"
-          data-rule="${filter.text}"
+          class="content"
+          contenteditable="${!this.disabled}"
+          title="${filter.text}"
           onkeydown="${this}"
           onkeyup="${this}"
           onblur="${this}"
@@ -527,47 +642,31 @@ function getRow(filter, i)
       <td data-info="warning">
         ${getWarning(filter)}
       </td>
-      <td data-info="hits">
-        ${filter.hits}
-      </td>
-      <td data-info="remove">
-        <button/>
-      </td>
     </tr>`;
+  }
   // no filter results into an empty, not editable, row
   return wire(this, `:${i}`)`
-    <tr
-      class="${className + " empty"}"
-      onclick="${this}"
-      data-call="onrowclick"
-    >
+    <tr class="empty">
+      <td data-info="selected"></td>
       <td data-info="status"></td>
       <td data-info="rule"></td>
       <td data-info="warning"></td>
-      <td data-info="hits"></td>
-      <td data-info="remove"></td>
     </tr>`;
 }
 
-const snails = new WeakMap();
-const createSnail = (filter) =>
+const warnings = new WeakMap();
+const createWarning = (filter) =>
 {
-  const snail = wire()`
-    <img src="skin/icons/snail.svg" title="${filter.slow}">`;
-  snails.set(filter, snail);
-  return snail;
+  const warning = new Image();
+  warning.src = "icons/alert.svg";
+  warnings.set(filter, warning);
+  return warning;
 };
+
 function getWarning(filter)
 {
-  switch (filter.slow)
-  {
-    case "🐌":
-      return snails.get(filter) || createSnail(filter);
-    case "!":
-      return "!";
-    default:
-      return "";
-  }
+  return filter.slow ?
+    (warnings.get(filter) || createWarning(filter)) : "";
 }
 
 function dispatch(info, detail)
@@ -581,45 +680,42 @@ function dispatch(info, detail)
   return event;
 }
 
-/*
-  to have a scrollable body, thead and tbody are set
-  as display: block, detaching their auto table alignment
-  so that this helper would set each header TH size accordingly
- */
-function setupTable()
+function setHeaderToggle()
 {
-  const table = $("table", this);
-  const THs = $$("thead th", this);
-  const TDs = $$("tbody tr:first-child td", table);
-  const size = [];
-  THs.forEach((th, i) =>
+  const toggle = $("thead io-toggle", this);
+  toggle.disabled = !this.selected.size;
+  // contextual state, enabled if all are enabled
+  // disabled otherwise to enable them all
+  for (const filter of this.selected)
   {
-    table.style.setProperty(`--width-${th.dataset.info}`, "auto");
-    size[i] = Math.max(th.clientWidth, TDs[i].clientWidth);
-  });
-  THs.forEach((th, i) =>
-  {
-    if (th.dataset.info === "rule")
+    if (filter.disabled)
     {
-      size[i] = table.clientWidth -
-                size.reduce((total, current) => total + current, -size[i]);
+      toggle.checked = false;
+      return;
     }
-    table.style.setProperty(`--width-${th.dataset.info}`, `${size[i]}px`);
-  });
-  table.classList.add("visible");
+  }
+  toggle.checked = !toggle.disabled;
 }
 
-function updateScrollbar()
+// the header io-toggle, if enabled,
+// changes all the filters status (disabled)
+function onHeaderToggleChange(event)
 {
-  const {rowHeight, viewHeight} = this.state;
-  const {length} = this.filters;
-  this.scrollbar.size = rowHeight * length;
-  this.setState({
-    scrollHeight: rowHeight * length - viewHeight + 7
-  });
+  const ioToggle = event.currentTarget;
+  const disabled = !ioToggle.checked;
+  const ioFilterList = ioToggle.closest("io-filter-list");
+  for (const filter of ioFilterList.selected)
+  {
+    if (disabled !== filter.disabled)
+    {
+      filter.disabled = disabled;
+      dispatch.call(ioFilterList, "update", filter);
+    }
+  }
+  ioFilterList.render();
 }
 
-},{"./dom":1,"./io-element":2,"./io-scrollbar":4}],4:[function(require,module,exports){
+},{"./dom":1,"./io-element":2,"./io-scrollbar":4,"./io-toggle":5}],4:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -727,16 +823,8 @@ class IOScrollbar extends IOElement
 
   set position(value)
   {
-    // if created procedurally
-    // the basic DOM info might not be there yet
     if (!this._elSize)
-    {
-      // in that case re-calculate the size
-      sizeChange.call(this);
-      // and if it's still unknown get out
-      if (!this._elSize)
-        return;
-    }
+      return;
     setPosition.call(this, value);
   }
 
@@ -872,6 +960,98 @@ function stop(event)
 }
 
 },{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+"use strict";
+
+const IOElement = require("./io-element");
+const {boolean} = IOElement.utils;
+
+class IOToggle extends IOElement
+{
+  // action, checked, and disabled should be reflected down the button
+  static get observedAttributes()
+  {
+    return ["action", "checked", "disabled"];
+  }
+
+  created()
+  {
+    this.addEventListener("click", this);
+    this.render();
+  }
+
+  get checked()
+  {
+    return this.hasAttribute("checked");
+  }
+
+  set checked(value)
+  {
+    boolean.attribute(this, "checked", value);
+    this.render();
+  }
+
+  get disabled()
+  {
+    return this.hasAttribute("disabled");
+  }
+
+  set disabled(value)
+  {
+    boolean.attribute(this, "disabled", value);
+  }
+
+  onclick(event)
+  {
+    if (!this.disabled)
+    {
+      this.checked = !this.checked;
+      if (this.ownerDocument.activeElement !== this.child)
+      {
+        this.child.focus();
+      }
+      this.dispatchEvent(new CustomEvent("change", {
+        bubbles: true,
+        cancelable: true,
+        detail: this.checked
+      }));
+    }
+  }
+
+  render()
+  {
+    this.html`
+    <button
+      role="checkbox"
+      disabled="${this.disabled}"
+      data-action="${this.action}"
+      aria-checked="${this.checked}"
+      aria-disabled="${this.disabled}"
+    />`;
+  }
+}
+
+IOToggle.define("io-toggle");
+
+module.exports = IOToggle;
+
+},{"./io-element":2}],6:[function(require,module,exports){
 /*!
 ISC License
 
@@ -2379,7 +2559,7 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 'use strict';
 /*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
@@ -2398,6 +2578,7 @@ const ownKeys = typeof Reflect === 'object' && Reflect.ownKeys ||
                 (o => getOwnPropertyNames(o).concat(getOwnPropertySymbols(o)));
 const setPrototypeOf = O.setPrototypeOf ||
                       ((o, p) => (o.__proto__ = p, o));
+const camel = name => name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase());
 
 class HyperHTMLElement extends HTMLElement {
 
@@ -2416,25 +2597,24 @@ class HyperHTMLElement extends HTMLElement {
     // attributes defined as boolean will have
     // an either available or not available attribute
     // regardless of the value.
-    // All falsy values mean attribute removed
+    // All falsy values, or "false", mean attribute removed
     // while truthy values will be set as is.
-    (Class.booleanAttributes || []).forEach(name => {
+    // Boolean attributes are also automatically observed.
+    const booleanAttributes = Class.booleanAttributes || [];
+    booleanAttributes.forEach(name => {
       if (!(name in proto)) defineProperty(
         proto,
-        name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase()),
+        camel(name),
         {
           configurable: true,
           get() {
             return this.hasAttribute(name);
           },
           set(value) {
-            const prev = this.getAttribute(name);
             if (!value || value === 'false')
               this.removeAttribute(name);
             else
               this.setAttribute(name, value);
-            if (hasChange && prev !== value)
-              this[ATTRIBUTE_CHANGED_CALLBACK](name, prev, value);
           }
         }
       );
@@ -2448,12 +2628,13 @@ class HyperHTMLElement extends HTMLElement {
     // will automatically do
     // el.setAttribute('observed', 123);
     // triggering also the attributeChangedCallback
-    (Class.observedAttributes || []).forEach(name => {
+    const observedAttributes = Class.observedAttributes || [];
+    observedAttributes.forEach(name => {
       // it is possible to redefine the behavior at any time
       // simply overwriting get prop() and set prop(value)
       if (!(name in proto)) defineProperty(
         proto,
-        name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase()),
+        camel(name),
         {
           configurable: true,
           get() {
@@ -2469,6 +2650,14 @@ class HyperHTMLElement extends HTMLElement {
       );
     });
 
+    // if these are defined, overwrite the observedAttributes getter
+    // to include also booleanAttributes
+    const attributes = booleanAttributes.concat(observedAttributes);
+    if (attributes.length)
+      defineProperty(Class, 'observedAttributes', {
+        get() { return attributes; }
+      });
+
     // created() {}
     // ---------------------------------
     // an initializer method that grants
@@ -2476,83 +2665,60 @@ class HyperHTMLElement extends HTMLElement {
     // It is ensured to run either after DOMContentLoaded,
     // or once there is a next sibling (stream-friendly) so that
     // you have full access to element attributes and/or childNodes.
-    const created = proto.created;
-    if (created) {
-      // used to ensure create() is called once and once only
-      defineProperty(
-        proto,
-        '_init$',
-        {
-          configurable: true,
-          writable: true,
-          value: true
-        }
-      );
+    const created = proto.created || function () {
+      this.render();
+    };
 
-      // ⚠️ if you need to overwrite/change attributeChangedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      defineProperty(
-        proto,
-        ATTRIBUTE_CHANGED_CALLBACK,
-        {
-          configurable: true,
-          value: function aCC(name, prev, curr) {
-            if (this._init$) {
-              checkReady.call(this, created);
-              if (this._init$)
-                return this._init$$.push(aCC.bind(this, name, prev, curr));
-            }
-            // ensure setting same value twice
-            // won't trigger twice attributeChangedCallback
-            if (hasChange && prev !== curr) {
-              onChanged.apply(this, arguments);
-            }
-          }
-        }
-      );
+    // used to ensure create() is called once and once only
+    defineProperty(
+      proto,
+      '_init$',
+      {
+        configurable: true,
+        writable: true,
+        value: true
+      }
+    );
 
-      // ⚠️ if you need to overwrite/change connectedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      const onConnected = proto.connectedCallback;
-      const hasConnect = !!onConnected;
-      defineProperty(
-        proto,
-        'connectedCallback',
-        {
-          configurable: true,
-          value: function cC() {
-            if (this._init$) {
-              checkReady.call(this, created);
-              if (this._init$)
-                return this._init$$.push(cC.bind(this));
-            }
-            if (hasConnect) {
-              onConnected.apply(this, arguments);
-            }
+    defineProperty(
+      proto,
+      ATTRIBUTE_CHANGED_CALLBACK,
+      {
+        configurable: true,
+        value: function aCC(name, prev, curr) {
+          if (this._init$) {
+            checkReady.call(this, created);
+            if (this._init$)
+              return this._init$$.push(aCC.bind(this, name, prev, curr));
+          }
+          // ensure setting same value twice
+          // won't trigger twice attributeChangedCallback
+          if (hasChange && prev !== curr) {
+            onChanged.apply(this, arguments);
           }
         }
-      );
-    } else if (hasChange) {
-      // ⚠️ if you need to overwrite/change attributeChangedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      defineProperty(
-        proto,
-        ATTRIBUTE_CHANGED_CALLBACK,
-        {
-          configurable: true,
-          value(name, prev, curr) {
-            // ensure setting same value twice
-            // won't trigger twice attributeChangedCallback
-            if (prev !== curr) {
-              onChanged.apply(this, arguments);
-            }
+      }
+    );
+
+    const onConnected = proto.connectedCallback;
+    const hasConnect = !!onConnected;
+    defineProperty(
+      proto,
+      'connectedCallback',
+      {
+        configurable: true,
+        value: function cC() {
+          if (this._init$) {
+            checkReady.call(this, created);
+            if (this._init$)
+              return this._init$$.push(cC.bind(this));
+          }
+          if (hasConnect) {
+            onConnected.apply(this, arguments);
           }
         }
-      );
-    }
+      }
+    );
 
     // define lazily all handlers
     // class { handleClick() { ... }
@@ -2579,9 +2745,6 @@ class HyperHTMLElement extends HTMLElement {
     //    render() { this.html`<input oninput="${this}">`; }
     //  }
     if (!('handleEvent' in proto)) {
-      // ⚠️ if you need to overwrite/change handleEvent method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
       defineProperty(
         proto,
         'handleEvent',
@@ -2651,12 +2814,12 @@ class HyperHTMLElement extends HTMLElement {
     defineProperty(this, '_html$', {configurable: true, value: value});
   }
 
+  // overwrite this method with your own render
+  render() {}
+
   // ---------------------//
   // Basic State Handling //
   // ---------------------//
-
-  // overwrite this method with your own render
-  render() {}
 
   // define the default state object
   // you could use observed properties too
@@ -2759,7 +2922,630 @@ function isReady(created) {
   return false;
 }
 
-},{"hyperhtml/cjs":11}],7:[function(require,module,exports){
+},{"hyperhtml/cjs":14}],8:[function(require,module,exports){
+'use strict';
+/* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
+/*! (c) 2018 Andrea Giammarchi (ISC) */
+
+const {
+  eqeq, identity, indexOf, isReversed, next, append, remove, smartDiff
+} = require('./utils.js');
+
+const domdiff = (
+  parentNode,     // where changes happen
+  currentNodes,   // Array of current items/nodes
+  futureNodes,    // Array of future items/nodes
+  options         // optional object with one of the following properties
+                  //  before: domNode
+                  //  compare(generic, generic) => true if same generic
+                  //  node(generic) => Node
+) => {
+  if (!options)
+    options = {};
+
+  const compare = options.compare || eqeq;
+  const get = options.node || identity;
+  const before = options.before == null ? null : get(options.before, 0);
+
+  const currentLength = currentNodes.length;
+  let currentEnd = currentLength;
+  let currentStart = 0;
+
+  let futureEnd = futureNodes.length;
+  let futureStart = 0;
+
+  // common prefix
+  while (
+    currentStart < currentEnd &&
+    futureStart < futureEnd &&
+    compare(currentNodes[currentStart], futureNodes[futureStart])
+  ) {
+    currentStart++;
+    futureStart++;
+  }
+
+  // common suffix
+  while (
+    currentStart < currentEnd &&
+    futureStart < futureEnd &&
+    compare(currentNodes[currentEnd - 1], futureNodes[futureEnd - 1])
+  ) {
+    currentEnd--;
+    futureEnd--;
+  }
+
+  const currentSame = currentStart === currentEnd;
+  const futureSame = futureStart === futureEnd;
+
+  // same list
+  if (currentSame && futureSame)
+    return futureNodes;
+
+  // only stuff to add
+  if (currentSame && futureStart < futureEnd) {
+    append(
+      get,
+      parentNode,
+      futureNodes,
+      futureStart,
+      futureEnd,
+      next(get, currentNodes, currentStart, currentLength, before)
+    );
+    return futureNodes;
+  }
+
+  // only stuff to remove
+  if (futureSame && currentStart < currentEnd) {
+    remove(
+      get,
+      parentNode,
+      currentNodes,
+      currentStart,
+      currentEnd
+    );
+    return futureNodes;
+  }
+
+  const currentChanges = currentEnd - currentStart;
+  const futureChanges = futureEnd - futureStart;
+  let i = -1;
+
+  // 2 simple indels: the shortest sequence is a subsequence of the longest
+  if (currentChanges < futureChanges) {
+    i = indexOf(
+      futureNodes,
+      futureStart,
+      futureEnd,
+      currentNodes,
+      currentStart,
+      currentEnd,
+      compare
+    );
+    // inner diff
+    if (-1 < i) {
+      append(
+        get,
+        parentNode,
+        futureNodes,
+        futureStart,
+        i,
+        get(currentNodes[currentStart], 0)
+      );
+      append(
+        get,
+        parentNode,
+        futureNodes,
+        i + currentChanges,
+        futureEnd,
+        next(get, currentNodes, currentEnd, currentLength, before)
+      );
+      return futureNodes;
+    }
+  }
+  /* istanbul ignore else */
+  else if (futureChanges < currentChanges) {
+    i = indexOf(
+      currentNodes,
+      currentStart,
+      currentEnd,
+      futureNodes,
+      futureStart,
+      futureEnd,
+      compare
+    );
+    // outer diff
+    if (-1 < i) {
+      remove(
+        get,
+        parentNode,
+        currentNodes,
+        currentStart,
+        i
+      );
+      remove(
+        get,
+        parentNode,
+        currentNodes,
+        i + futureChanges,
+        currentEnd
+      );
+      return futureNodes;
+    }
+  }
+
+  // common case with one replacement for many nodes
+  // or many nodes replaced for a single one
+  /* istanbul ignore else */
+  if ((currentChanges < 2 || futureChanges < 2)) {
+    append(
+      get,
+      parentNode,
+      futureNodes,
+      futureStart,
+      futureEnd,
+      get(currentNodes[currentStart], 0)
+    );
+    remove(
+      get,
+      parentNode,
+      currentNodes,
+      currentStart,
+      currentEnd
+    );
+    return futureNodes;
+  }
+
+  // the half match diff part has been skipped in petit-dom
+  // https://github.com/yelouafi/petit-dom/blob/bd6f5c919b5ae5297be01612c524c40be45f14a7/src/vdom.js#L391-L397
+  // accordingly, I think it's safe to skip in here too
+  // if one day it'll come out like the speediest thing ever to do
+  // then I might add it in here too
+
+  // Extra: before going too fancy, what about reversed lists ?
+  //        This should bail out pretty quickly if that's not the case.
+  if (
+    currentChanges === futureChanges &&
+    isReversed(
+      futureNodes,
+      futureEnd,
+      currentNodes,
+      currentStart,
+      currentEnd,
+      compare
+    )
+  ) {
+    append(
+      get,
+      parentNode,
+      futureNodes,
+      futureStart,
+      futureEnd,
+      next(get, currentNodes, currentEnd, currentLength, before)
+    );
+    return futureNodes;
+  }
+
+  // last resort through a smart diff
+  smartDiff(
+    get,
+    parentNode,
+    futureNodes,
+    futureStart,
+    futureEnd,
+    futureChanges,
+    currentNodes,
+    currentStart,
+    currentEnd,
+    currentChanges,
+    currentLength,
+    compare,
+    before
+  );
+
+  return futureNodes;
+};
+
+Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
+
+},{"./utils.js":9}],9:[function(require,module,exports){
+'use strict';
+/* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
+const append = (get, parent, children, start, end, before) => {
+  if ((end - start) < 2)
+    parent.insertBefore(get(children[start], 1), before);
+  else {
+    const fragment = parent.ownerDocument.createDocumentFragment();
+    while (start < end)
+      fragment.appendChild(get(children[start++], 1));
+    parent.insertBefore(fragment, before);
+  }
+};
+exports.append = append;
+
+const eqeq = (a, b) => a == b;
+exports.eqeq = eqeq;
+
+const identity = O => O;
+exports.identity = identity;
+
+const indexOf = (
+  moreNodes,
+  moreStart,
+  moreEnd,
+  lessNodes,
+  lessStart,
+  lessEnd,
+  compare
+) => {
+  const length = lessEnd - lessStart;
+  /* istanbul ignore if */
+  if (length < 1)
+    return -1;
+  while ((moreEnd - moreStart) >= length) {
+    let m = moreStart;
+    let l = lessStart;
+    while (
+      m < moreEnd &&
+      l < lessEnd &&
+      compare(moreNodes[m], lessNodes[l])
+    ) {
+      m++;
+      l++;
+    }
+    if (l === lessEnd)
+      return moreStart;
+    moreStart = m + 1;
+  }
+  return -1;
+};
+exports.indexOf = indexOf;
+
+const isReversed = (
+  futureNodes,
+  futureEnd,
+  currentNodes,
+  currentStart,
+  currentEnd,
+  compare
+) => {
+  while (
+    currentStart < currentEnd &&
+    compare(
+      currentNodes[currentStart],
+      futureNodes[futureEnd - 1]
+    )) {
+      currentStart++;
+      futureEnd--;
+    };
+  return futureEnd === 0;
+};
+exports.isReversed = isReversed;
+
+const next = (get, list, i, length, before) => i < length ?
+              get(list[i], 0) :
+              (0 < i ?
+                get(list[i - 1], -0).nextSibling :
+                before);
+exports.next = next;
+
+const remove = (get, parent, children, start, end) => {
+  if ((end - start) < 2)
+    parent.removeChild(get(children[start], -1));
+  else {
+    const range = parent.ownerDocument.createRange();
+    range.setStartBefore(get(children[start], -1));
+    range.setEndAfter(get(children[end - 1], -1));
+    range.deleteContents();
+  }
+};
+exports.remove = remove;
+
+// - - - - - - - - - - - - - - - - - - -
+// diff related constants and utilities
+// - - - - - - - - - - - - - - - - - - -
+
+const DELETION = -1;
+const INSERTION = 1;
+const SKIP = 0;
+const SKIP_OND = 50;
+
+/* istanbul ignore next */
+const Rel = typeof Map === 'undefined' ?
+  function () {
+    const k = [], v = [];
+    return {
+      has: value => -1 < k.indexOf(value),
+      get: value => v[k.indexOf(value)],
+      set: value => {
+        const i = k.indexOf(value);
+        v[i < 0 ? (k.push(value) - 1) : i] = value;
+      }
+    };
+  } :
+  Map
+;
+
+const HS = (
+  futureNodes,
+  futureStart,
+  futureEnd,
+  futureChanges,
+  currentNodes,
+  currentStart,
+  currentEnd,
+  currentChanges
+) => {
+
+  let k = 0;
+  /* istanbul ignore next */
+  let minLen = futureChanges < currentChanges ? futureChanges : currentChanges;
+  const link = Array(minLen++);
+  const tresh = Array(minLen);
+  tresh[0] = -1;
+
+  for (let i = 1; i < minLen; i++)
+    tresh[i] = currentEnd;
+
+  const keymap = new Rel;
+  for (let i = currentStart; i < currentEnd; i++)
+    keymap.set(currentNodes[i], i);
+
+  for (let i = futureStart; i < futureEnd; i++) {
+    const idxInOld = keymap.get(futureNodes[i]);
+    if (idxInOld != null) {
+      k = findK(tresh, minLen, idxInOld);
+      /* istanbul ignore else */
+      if (-1 < k) {
+        tresh[k] = idxInOld;
+        link[k] = {
+          newi: i,
+          oldi: idxInOld,
+          prev: link[k - 1]
+        };
+      }
+    }
+  }
+
+  k = --minLen;
+  --currentEnd;
+  while (tresh[k] > currentEnd) --k;
+
+  minLen = currentChanges + futureChanges - k;
+  const diff = Array(minLen);
+  let ptr = link[k];
+  --futureEnd;
+  while (ptr) {
+    const {newi, oldi} = ptr;
+    while (futureEnd > newi) {
+      diff[--minLen] = INSERTION;
+      --futureEnd;
+    }
+    while (currentEnd > oldi) {
+      diff[--minLen] = DELETION;
+      --currentEnd;
+    }
+    diff[--minLen] = SKIP;
+    --futureEnd;
+    --currentEnd;
+    ptr = ptr.prev;
+  }
+  while (futureEnd >= futureStart) {
+    diff[--minLen] = INSERTION;
+    --futureEnd;
+  }
+  while (currentEnd >= currentStart) {
+    diff[--minLen] = DELETION;
+    --currentEnd;
+  }
+  return diff;
+};
+
+// this is pretty much the same petit-dom code without the delete map part
+// https://github.com/yelouafi/petit-dom/blob/bd6f5c919b5ae5297be01612c524c40be45f14a7/src/vdom.js#L556-L561
+const OND = (
+  futureNodes,
+  futureStart,
+  rows,
+  currentNodes,
+  currentStart,
+  cols,
+  compare
+) => {
+  const length = rows + cols;
+  const v = [];
+  let d, k, r, c, pv, cv, pd;
+  outer: for (d = 0; d <= length; d++) {
+    /* istanbul ignore if */
+    if (d > SKIP_OND)
+      return null;
+    pd = d - 1;
+    /* istanbul ignore next */
+    pv = d ? v[d - 1] : [0, 0];
+    cv = v[d] = [];
+    for (k = -d; k <= d; k += 2) {
+      if (k === -d || (k !== d && pv[pd + k - 1] < pv[pd + k + 1])) {
+        c = pv[pd + k + 1];
+      } else {
+        c = pv[pd + k - 1] + 1;
+      }
+      r = c - k;
+      while (
+        c < cols &&
+        r < rows &&
+        compare(
+          currentNodes[currentStart + c],
+          futureNodes[futureStart + r]
+        )
+      ) {
+        c++;
+        r++;
+      }
+      if (c === cols && r === rows) {
+        break outer;
+      }
+      cv[d + k] = c;
+    }
+  }
+
+  const diff = Array(d / 2 + length / 2);
+  let diffIdx = diff.length - 1;
+  for (d = v.length - 1; d >= 0; d--) {
+    while (
+      c > 0 &&
+      r > 0 &&
+      compare(
+        currentNodes[currentStart + c - 1],
+        futureNodes[futureStart + r - 1]
+      )
+    ) {
+      // diagonal edge = equality
+      diff[diffIdx--] = SKIP;
+      c--;
+      r--;
+    }
+    if (!d)
+      break;
+    pd = d - 1;
+    /* istanbul ignore next */
+    pv = d ? v[d - 1] : [0, 0];
+    k = c - r;
+    if (k === -d || (k !== d && pv[pd + k - 1] < pv[pd + k + 1])) {
+      // vertical edge = insertion
+      r--;
+      diff[diffIdx--] = INSERTION;
+    } else {
+      // horizontal edge = deletion
+      c--;
+      diff[diffIdx--] = DELETION;
+    }
+  }
+  return diff;
+};
+
+const applyDiff = (
+  diff,
+  get,
+  parentNode,
+  futureNodes,
+  futureStart,
+  currentNodes,
+  currentStart,
+  currentLength,
+  before
+) => {
+  const live = new Rel;
+  const length = diff.length;
+  let currentIndex = currentStart;
+  let i = 0;
+  while (i < length) {
+    switch (diff[i++]) {
+      case SKIP:
+        futureStart++;
+        currentIndex++;
+        break;
+      case INSERTION:
+        // TODO: bulk appends for sequential nodes
+        live.set(futureNodes[futureStart], 1);
+        append(
+          get,
+          parentNode,
+          futureNodes,
+          futureStart++,
+          futureStart,
+          currentIndex < currentLength ?
+            get(currentNodes[currentIndex], 1) :
+            before
+        );
+        break;
+      case DELETION:
+        currentIndex++;
+        break;
+    }
+  }
+  i = 0;
+  while (i < length) {
+    switch (diff[i++]) {
+      case SKIP:
+        currentStart++;
+        break;
+      case DELETION:
+        // TODO: bulk removes for sequential nodes
+        if (live.has(currentNodes[currentStart]))
+          currentStart++;
+        else
+          remove(
+            get,
+            parentNode,
+            currentNodes,
+            currentStart++,
+            currentStart
+          );
+        break;
+    }
+  }
+};
+
+const findK = (ktr, length, j) => {
+  let lo = 1;
+  let hi = length;
+  while (lo < hi) {
+    var mid = ((lo + hi) / 2) >>> 0;
+    if (j < ktr[mid])
+      hi = mid;
+    else
+      lo = mid + 1;
+  }
+  return lo;
+}
+
+const smartDiff = (
+  get,
+  parentNode,
+  futureNodes,
+  futureStart,
+  futureEnd,
+  futureChanges,
+  currentNodes,
+  currentStart,
+  currentEnd,
+  currentChanges,
+  currentLength,
+  compare,
+  before
+) => {
+  applyDiff(
+    OND(
+      futureNodes,
+      futureStart,
+      futureChanges,
+      currentNodes,
+      currentStart,
+      currentChanges,
+      compare
+    ) ||
+    HS(
+      futureNodes,
+      futureStart,
+      futureEnd,
+      futureChanges,
+      currentNodes,
+      currentStart,
+      currentEnd,
+      currentChanges
+    ),
+    get,
+    parentNode,
+    futureNodes,
+    futureStart,
+    currentNodes,
+    currentStart,
+    currentLength,
+    before
+  );
+};
+exports.smartDiff = smartDiff;
+
+},{}],10:[function(require,module,exports){
 'use strict';
 const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
@@ -2916,7 +3702,7 @@ const setValue = (self, secret, value) =>
   })[secret]
 ;
 
-},{"../shared/poorlyfills.js":20}],8:[function(require,module,exports){
+},{"../shared/poorlyfills.js":22}],11:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -2951,7 +3737,7 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":18,"../shared/utils.js":22}],9:[function(require,module,exports){
+},{"../shared/easy-dom.js":20,"../shared/utils.js":24}],12:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
 const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
@@ -3033,7 +3819,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":15,"../shared/constants.js":16,"../shared/poorlyfills.js":20,"../shared/re.js":21,"../shared/utils.js":22}],10:[function(require,module,exports){
+},{"../objects/Updates.js":18,"../shared/constants.js":19,"../shared/poorlyfills.js":22,"../shared/re.js":23,"../shared/utils.js":24}],13:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -3133,7 +3919,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./render.js":9}],11:[function(require,module,exports){
+},{"../classes/Wire.js":11,"../shared/constants.js":19,"../shared/easy-dom.js":20,"../shared/poorlyfills.js":22,"../shared/utils.js":24,"./render.js":12}],14:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -3143,7 +3929,7 @@ const Intent = (m => m.__esModule ? m.default : m)(require('./objects/Intent.js'
 const wire = (m => m.__esModule ? m.default : m)(require('./hyper/wire.js'));
 const {content, weakly} = require('./hyper/wire.js');
 const render = (m => m.__esModule ? m.default : m)(require('./hyper/render.js'));
-const diff = (m => m.__esModule ? m.default : m)(require('./shared/domdiff.js'));
+const diff = (m => m.__esModule ? m.default : m)(require('./3rd/domdiff.js'));
 
 // all functions are self bound to the right context
 // you can do the following
@@ -3195,7 +3981,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./classes/Component.js":7,"./hyper/render.js":9,"./hyper/wire.js":10,"./objects/Intent.js":12,"./shared/domdiff.js":17}],12:[function(require,module,exports){
+},{"./3rd/domdiff.js":8,"./classes/Component.js":10,"./hyper/render.js":12,"./hyper/wire.js":13,"./objects/Intent.js":15}],15:[function(require,module,exports){
 'use strict';
 const attributes = {};
 const intents = {};
@@ -3237,7 +4023,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],13:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -3297,7 +4083,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":16}],14:[function(require,module,exports){
+},{"../shared/constants.js":19}],17:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -3334,27 +4120,37 @@ const update = (style, isSVG) => {
               }
             }
           } else {
-            if (isSVG) style.value = '';
-            else style.cssText = '';
+            if (isSVG)
+              style.value = '';
+            else
+              style.cssText = '';
           }
           const info = isSVG ? {} : style;
           for (const key in newValue) {
             const value = newValue[key];
-            info[key] = typeof value === 'number' &&
-                        !IS_NON_DIMENSIONAL.test(key) ?
-                          (value + 'px') : value;
+            const styleValue = typeof value === 'number' &&
+                                !IS_NON_DIMENSIONAL.test(key) ?
+                                (value + 'px') : value;
+            if (/^--/.test(key))
+              info.setProperty(key, styleValue);
+            else
+              info[key] = styleValue;
           }
           oldType = 'object';
-          if (isSVG) style.value = toStyle((oldValue = info));
-          else oldValue = newValue;
+          if (isSVG)
+            style.value = toStyle((oldValue = info));
+          else
+            oldValue = newValue;
           break;
         }
       default:
         if (oldValue != newValue) {
           oldType = 'string';
           oldValue = newValue;
-          if (isSVG) style.value = newValue || '';
-          else style.cssText = newValue || '';
+          if (isSVG)
+            style.value = newValue || '';
+          else
+            style.cssText = newValue || '';
         }
         break;
     }
@@ -3370,7 +4166,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],15:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -3381,7 +4177,7 @@ const Wire = (m => m.__esModule ? m.default : m)(require('../classes/Wire.js'));
 const Path = (m => m.__esModule ? m.default : m)(require('./Path.js'));
 const Style = (m => m.__esModule ? m.default : m)(require('./Style.js'));
 const Intent = (m => m.__esModule ? m.default : m)(require('./Intent.js'));
-const domdiff = (m => m.__esModule ? m.default : m)(require('../shared/domdiff.js'));
+const domdiff = (m => m.__esModule ? m.default : m)(require('../3rd/domdiff.js'));
 // see /^script$/i.test(nodeName) bit down here
 // import { create as createElement, text } from '../shared/easy-dom.js';
 const { text } = require('../shared/easy-dom.js');
@@ -3894,7 +4690,7 @@ function observe() {
   }
 }
 
-},{"../classes/Component.js":7,"../classes/Wire.js":8,"../shared/constants.js":16,"../shared/domdiff.js":17,"../shared/easy-dom.js":18,"../shared/poorlyfills.js":20,"../shared/utils.js":22,"./Intent.js":12,"./Path.js":13,"./Style.js":14}],16:[function(require,module,exports){
+},{"../3rd/domdiff.js":8,"../classes/Component.js":10,"../classes/Wire.js":11,"../shared/constants.js":19,"../shared/easy-dom.js":20,"../shared/poorlyfills.js":22,"../shared/utils.js":24,"./Intent.js":15,"./Path.js":16,"./Style.js":17}],19:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -3939,171 +4735,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],17:[function(require,module,exports){
-'use strict';
-/* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
-/*! (c) 2017 Andrea Giammarchi (ISC) */
-
-/**
- * This code is a revisited port of the snabbdom vDOM diffing logic,
- * the same that fuels as fork Vue.js or other libraries.
- * @credits https://github.com/snabbdom/snabbdom
- */
-
-const eqeq = (a, b) => a == b;
-
-const identity = O => O;
-
-const remove = (get, parentNode, before, after) => {
-  if (after == null) {
-    parentNode.removeChild(get(before, -1));
-  } else {
-    const range = parentNode.ownerDocument.createRange();
-    range.setStartBefore(get(before, -1));
-    range.setEndAfter(get(after, -1));
-    range.deleteContents();
-  }
-};
-
-const domdiff = (
-  parentNode,     // where changes happen
-  currentNodes,   // Array of current items/nodes
-  futureNodes,    // Array of future items/nodes
-  options         // optional object with one of the following properties
-                  //  before: domNode
-                  //  compare(generic, generic) => true if same generic
-                  //  node(generic) => Node
-) => {
-  if (!options)
-    options = {};
-  const compare = options.compare || eqeq;
-  const get = options.node || identity;
-  const before = options.before == null ? null : get(options.before, 0);
-  let currentStart = 0, futureStart = 0;
-  let currentEnd = currentNodes.length - 1;
-  let currentStartNode = currentNodes[0];
-  let currentEndNode = currentNodes[currentEnd];
-  let futureEnd = futureNodes.length - 1;
-  let futureStartNode = futureNodes[0];
-  let futureEndNode = futureNodes[futureEnd];
-  while (currentStart <= currentEnd && futureStart <= futureEnd) {
-    if (currentStartNode == null) {
-      currentStartNode = currentNodes[++currentStart];
-    }
-    else if (currentEndNode == null) {
-      currentEndNode = currentNodes[--currentEnd];
-    }
-    else if (futureStartNode == null) {
-      futureStartNode = futureNodes[++futureStart];
-    }
-    else if (futureEndNode == null) {
-      futureEndNode = futureNodes[--futureEnd];
-    }
-    else if (compare(currentStartNode, futureStartNode)) {
-      currentStartNode = currentNodes[++currentStart];
-      futureStartNode = futureNodes[++futureStart];
-    }
-    else if (compare(currentEndNode, futureEndNode)) {
-      currentEndNode = currentNodes[--currentEnd];
-      futureEndNode = futureNodes[--futureEnd];
-    }
-    else if (compare(currentStartNode, futureEndNode)) {
-      parentNode.insertBefore(
-        get(currentStartNode, 1),
-        get(currentEndNode, -0).nextSibling
-      );
-      currentStartNode = currentNodes[++currentStart];
-      futureEndNode = futureNodes[--futureEnd];
-    }
-    else if (compare(currentEndNode, futureStartNode)) {
-      parentNode.insertBefore(
-        get(currentEndNode, 1),
-        get(currentStartNode, 0)
-      );
-      currentEndNode = currentNodes[--currentEnd];
-      futureStartNode = futureNodes[++futureStart];
-    }
-    else {
-      let index = currentNodes.indexOf(futureStartNode);
-      if (index < 0) {
-        parentNode.insertBefore(
-          get(futureStartNode, 1),
-          get(currentStartNode, 0)
-        );
-        futureStartNode = futureNodes[++futureStart];
-      }
-      else {
-        let i = index;
-        let f = futureStart;
-        while (
-          i <= currentEnd &&
-          f <= futureEnd &&
-          currentNodes[i] === futureNodes[f]
-        ) {
-          i++;
-          f++;
-        }
-        if (1 < (i - index)) {
-          if (--index === currentStart) {
-            parentNode.removeChild(get(currentStartNode, -1));
-          } else {
-            remove(
-              get,
-              parentNode,
-              currentStartNode,
-              currentNodes[index]
-            );
-          }
-          currentStart = i;
-          futureStart = f;
-          currentStartNode = currentNodes[i];
-          futureStartNode = futureNodes[f];
-        } else {
-          const el = currentNodes[index];
-          currentNodes[index] = null;
-          parentNode.insertBefore(get(el, 1), get(currentStartNode, 0));
-          futureStartNode = futureNodes[++futureStart];
-        }
-      }
-    }
-  }
-  if (currentStart <= currentEnd || futureStart <= futureEnd) {
-    if (currentStart > currentEnd) {
-      const pin = futureNodes[futureEnd + 1];
-      const place = pin == null ? before : get(pin, 0);
-      if (futureStart === futureEnd) {
-        parentNode.insertBefore(get(futureNodes[futureStart], 1), place);
-      }
-      else {
-        const fragment = parentNode.ownerDocument.createDocumentFragment();
-        while (futureStart <= futureEnd) {
-          fragment.appendChild(get(futureNodes[futureStart++], 1));
-        }
-        parentNode.insertBefore(fragment, place);
-      }
-    }
-    else {
-      if (currentNodes[currentStart] == null)
-        currentStart++;
-      if (currentStart === currentEnd) {
-        parentNode.removeChild(get(currentNodes[currentStart], -1));
-      }
-      else {
-        remove(
-          get,
-          parentNode,
-          currentNodes[currentStart],
-          currentNodes[currentEnd]
-        );
-      }
-    }
-  }
-  return futureNodes;
-};
-
-Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
-
-},{}],18:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -4115,7 +4747,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],19:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -4142,7 +4774,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":18}],20:[function(require,module,exports){
+},{"./easy-dom.js":20}],22:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -4216,7 +4848,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":16}],21:[function(require,module,exports){
+},{"./constants.js":19}],23:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -4241,7 +4873,7 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],22:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
@@ -4364,6 +4996,7 @@ exports.slice = slice;
 const unique = template => TL(template);
 exports.unique = unique;
 
+// https://codepen.io/WebReflection/pen/dqZrpV?editors=0010
 // TL returns a unique version of the template
 // it needs lazy feature detection
 // (cannot trust literals with transpiled code)
@@ -4371,6 +5004,7 @@ let TL = t => {
   if (
     // TypeScript template literals are not standard
     t.propertyIsEnumerable('raw') ||
+    !Object.isFrozen(t.raw) ||
     (
         // Firefox < 55 has not standard implementation neither
         /Firefox\/(\d+)/.test((G.navigator || {}).userAgent) &&
@@ -4448,7 +5082,7 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":16,"./easy-dom.js":18,"./features-detection.js":19,"./poorlyfills.js":20,"./re.js":21}],23:[function(require,module,exports){
+},{"./constants.js":19,"./easy-dom.js":20,"./features-detection.js":21,"./poorlyfills.js":22,"./re.js":23}],25:[function(require,module,exports){
 "use strict";
 
 require("../js/io-filter-list");
@@ -4460,11 +5094,9 @@ fetch("../tests/easylist.txt")
         const filters = text.replace(/^[![].*/gm, "").split("\n")
                             .filter(line => line.trim().length)
                             .map(line => ({
-                              enabled: Math.random() < 0.5,
-                              text: line,
-                              hits: (Math.random() * 9) >>> 0,
-                              slow: Math.random() < 0.2 ? "🐌" :
-                                    (Math.random() < 0.3 ? "!" : "")
+                              disabled: Math.random() < 0.5,
+                              slow: Math.random() < 0.5,
+                              text: line
                             }));
 
         const ioFilterList = document.querySelector("io-filter-list");
@@ -4487,4 +5119,4 @@ fetch("../tests/easylist.txt")
         ioFilterList.addEventListener("filter:update", window.console.log);
       });
 
-},{"../js/io-filter-list":3}]},{},[23]);
+},{"../js/io-filter-list":3}]},{},[25]);

@@ -14,24 +14,30 @@
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
-io-filter-search {
-  display: flex;
-  flex-direction: row;
-  height: 48px; }
+io-checkbox {
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 2px;
+  padding: 0px;
+  border: 0.2rem solid transparent;
+  cursor: pointer; }
 
-io-filter-search > input {
-  padding: 0 8px;
-  border: 1px solid #bcbcbc;
-  font-size: inherit;
-  flex-grow: 1; }
-
-io-filter-search > button {
-  padding: 0 32px;
+io-checkbox > button {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   border: 0;
-  color: #fff;
-  background-color: #3a97b9;
-  font-weight: 400;
-  text-transform: uppercase; }
+  background-color: transparent;
+  background-image: url(icons/checkbox.svg?off#off);
+  background-repeat: no-repeat;
+  background-size: contain; }
 
-io-filter-search > button:disabled {
-  opacity: 0.7; }
+io-checkbox[disabled] > button {
+  outline: none;
+  opacity: 0.5;
+  cursor: default; }
+
+io-checkbox[checked] > button {
+  background-image: url(icons/checkbox.svg?on#on); }
