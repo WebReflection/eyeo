@@ -18,21 +18,9 @@
 
 "use strict";
 
-const {slice} = Array.prototype;
-
-const $$ = (selector, container = document) =>
-            container.querySelectorAll(selector);
-
 module.exports = {
   $: (selector, container = document) => container.querySelector(selector),
-
-  // while Symbol.iterator is needed for for/of loops
-  // the forEach method was introduced after and it's handy
-  // in some circumstance, hence a better check, without the need
-  // to pollute the global prototype.
-  $$: "forEach" in NodeList.prototype ?
-      $$ :
-      (selector, container = document) => slice.call($$(selector, container)),
+  $$: (selector, container = document) => container.querySelectorAll(selector),
 
   // basic copy and paste clipboard utility
   clipboard: {
@@ -93,6 +81,75 @@ module.exports = {
 };
 
 },{}],2:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+"use strict";
+
+const IOElement = require("./io-element");
+
+class IOCheckbox extends IOElement
+{
+  static get booleanAttributes()
+  {
+    return ["checked", "disabled"];
+  }
+
+  attributeChangedCallback()
+  {
+    this.render();
+  }
+
+  created()
+  {
+    this.addEventListener("click", this);
+    this.render();
+  }
+
+  onclick(event)
+  {
+    if (!this.disabled)
+    {
+      this.checked = !this.checked;
+      this.dispatchEvent(new CustomEvent("change", {
+        bubbles: true,
+        cancelable: true,
+        detail: this.checked
+      }));
+    }
+  }
+
+  render()
+  {
+    this.html`
+    <button
+      role="checkbox"
+      disabled="${this.disabled}"
+      aria-checked="${this.checked}"
+      aria-disabled="${this.disabled}"
+    />`;
+  }
+}
+
+IOCheckbox.define("io-checkbox");
+
+module.exports = IOCheckbox;
+
+},{"./io-element":3}],3:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -251,7 +308,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":6,"hyperhtml-element/cjs":7}],3:[function(require,module,exports){
+},{"document-register-element/pony":7,"hyperhtml-element/cjs":8}],4:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -271,10 +328,12 @@ module.exports = IOElement;
 
 "use strict";
 
+require("./io-checkbox");
 require("./io-toggle");
 
 const IOElement = require("./io-element");
 const IOScrollbar = require("./io-scrollbar");
+
 const {utils, wire} = IOElement;
 
 const {$, $$} = require("./dom");
@@ -338,13 +397,11 @@ class IOFilterList extends IOElement
   set filters(value)
   {
     this.selected = [];
-    // clear any previous style rule
+    // clear any previous --rule-width info
     this.style.setProperty("--rule-width", "auto");
     // render one row only for the setup
-    this.setState({
-      infinite: false,
-      filters: []
-    });
+    this.setState({infinite: false, filters: []});
+    // set current flex grown rule column
     this.style.setProperty(
       "--rule-width",
       $('[data-info="rule"]', this).clientWidth + "px"
@@ -409,6 +466,7 @@ class IOFilterList extends IOElement
       },
       {passive: false}
     );
+    setScrollbarReactiveOpacity.call(this);
   }
 
   scrollTo(row)
@@ -430,13 +488,10 @@ class IOFilterList extends IOElement
     const {info} = th.dataset;
     if (info === "remove")
       return;
-    // avoid toggle passing through
-    if (info === "status" && this.selected.size)
-      return;
     if (info === "selected")
     {
-      this.selected = event.target.checked ? this.filters : [];
-      setHeaderToggle.call(this);
+      const ioCheckbox = event.target.closest("io-checkbox");
+      this.selected = ioCheckbox.checked ? this.filters : [];
       return;
     }
     event.preventDefault();
@@ -532,7 +587,6 @@ class IOFilterList extends IOElement
           else
             this.selected.add(filter);
         }
-        setHeaderToggle.call(this);
         break;
       case "status":
         filter.disabled = !filter.disabled;
@@ -581,10 +635,8 @@ class IOFilterList extends IOElement
     }
     this.html`<table cellpadding="0" cellspacing="0">
       <thead onclick="${this}" data-call="onheaderclick">
-        <th data-info="selected"><input type="checkbox"></th>
-        <th data-info="status">
-          <io-toggle disabled="true" onchange="${onHeaderToggleChange}" />
-        </th>
+        <th data-info="selected"><io-checkbox /></th>
+        <th data-info="status"></th>
         <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
         <th data-info="warning">${
           // for the header, just return always the same warning icon
@@ -623,8 +675,7 @@ function getRow(filter, i)
     return wire(filter)`
     <tr class="${selected ? "selected" : ""}">
       <td data-info="selected">
-        <input type="checkbox" checked="${selected}"
-                onclick="${this}" data-call="onchange">
+        <io-checkbox checked="${selected}" onchange="${this}" />
       </td>
       <td data-info="status">
         <io-toggle checked="${!filter.disabled}" onchange="${this}" />
@@ -654,6 +705,14 @@ function getRow(filter, i)
     </tr>`;
 }
 
+const createIssue = (filter) =>
+{
+  const issue = new Image();
+  issue.src = "icons/alert.svg";
+  issue.title = browser.i18n.getMessage(filter.reason);
+  return issue;
+};
+
 const warnings = new WeakMap();
 const createWarning = (filter) =>
 {
@@ -662,12 +721,6 @@ const createWarning = (filter) =>
   warnings.set(filter, warning);
   return warning;
 };
-
-function getWarning(filter)
-{
-  return filter.slow ?
-    (warnings.get(filter) || createWarning(filter)) : "";
-}
 
 function dispatch(info, detail)
 {
@@ -680,42 +733,38 @@ function dispatch(info, detail)
   return event;
 }
 
-function setHeaderToggle()
+function getWarning(filter)
 {
-  const toggle = $("thead io-toggle", this);
-  toggle.disabled = !this.selected.size;
-  // contextual state, enabled if all are enabled
-  // disabled otherwise to enable them all
-  for (const filter of this.selected)
-  {
-    if (filter.disabled)
-    {
-      toggle.checked = false;
-      return;
-    }
-  }
-  toggle.checked = !toggle.disabled;
+  if (filter.reason)
+    return createIssue(filter);
+  if (filter.slow)
+    return warnings.get(filter) || createWarning(filter);
+  return "";
 }
 
-// the header io-toggle, if enabled,
-// changes all the filters status (disabled)
-function onHeaderToggleChange(event)
+function setScrollbarReactiveOpacity()
 {
-  const ioToggle = event.currentTarget;
-  const disabled = !ioToggle.checked;
-  const ioFilterList = ioToggle.closest("io-filter-list");
-  for (const filter of ioFilterList.selected)
+  // get native value for undefined opacity
+  const opacity = this.scrollbar.style.opacity;
+  // cache it once to never duplicate listeners
+  const cancelOpacity = () =>
   {
-    if (disabled !== filter.disabled)
-    {
-      filter.disabled = disabled;
-      dispatch.call(ioFilterList, "update", filter);
-    }
-  }
-  ioFilterList.render();
+    // store default opacity value back
+    this.scrollbar.style.opacity = opacity;
+    // drop all listeners
+    document.removeEventListener("pointerup", cancelOpacity);
+    document.removeEventListener("pointercancel", cancelOpacity);
+  };
+  // add listeners on scrollbaro pointerdown event
+  this.scrollbar.addEventListener("pointerdown", () =>
+  {
+    this.scrollbar.style.opacity = 1;
+    document.addEventListener("pointerup", cancelOpacity);
+    document.addEventListener("pointercancel", cancelOpacity);
+  });
 }
 
-},{"./dom":1,"./io-element":2,"./io-scrollbar":4,"./io-toggle":5}],4:[function(require,module,exports){
+},{"./dom":1,"./io-checkbox":2,"./io-element":3,"./io-scrollbar":5,"./io-toggle":6}],5:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -959,7 +1008,7 @@ function stop(event)
   event.stopPropagation();
 }
 
-},{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
+},{"./dom":1,"./io-element":3}],6:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -1051,7 +1100,7 @@ IOToggle.define("io-toggle");
 
 module.exports = IOToggle;
 
-},{"./io-element":2}],6:[function(require,module,exports){
+},{"./io-element":3}],7:[function(require,module,exports){
 /*!
 ISC License
 
@@ -2559,7 +2608,7 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 'use strict';
 /*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
@@ -2922,7 +2971,7 @@ function isReady(created) {
   return false;
 }
 
-},{"hyperhtml/cjs":14}],8:[function(require,module,exports){
+},{"hyperhtml/cjs":15}],9:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 /*! (c) 2018 Andrea Giammarchi (ISC) */
@@ -3147,7 +3196,7 @@ const domdiff = (
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
 
-},{"./utils.js":9}],9:[function(require,module,exports){
+},{"./utils.js":10}],10:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 const append = (get, parent, children, start, end, before) => {
@@ -3545,7 +3594,7 @@ const smartDiff = (
 };
 exports.smartDiff = smartDiff;
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
@@ -3702,7 +3751,7 @@ const setValue = (self, secret, value) =>
   })[secret]
 ;
 
-},{"../shared/poorlyfills.js":22}],11:[function(require,module,exports){
+},{"../shared/poorlyfills.js":23}],12:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -3737,7 +3786,7 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":20,"../shared/utils.js":24}],12:[function(require,module,exports){
+},{"../shared/easy-dom.js":21,"../shared/utils.js":25}],13:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
 const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
@@ -3819,7 +3868,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":18,"../shared/constants.js":19,"../shared/poorlyfills.js":22,"../shared/re.js":23,"../shared/utils.js":24}],13:[function(require,module,exports){
+},{"../objects/Updates.js":19,"../shared/constants.js":20,"../shared/poorlyfills.js":23,"../shared/re.js":24,"../shared/utils.js":25}],14:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -3919,7 +3968,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":11,"../shared/constants.js":19,"../shared/easy-dom.js":20,"../shared/poorlyfills.js":22,"../shared/utils.js":24,"./render.js":12}],14:[function(require,module,exports){
+},{"../classes/Wire.js":12,"../shared/constants.js":20,"../shared/easy-dom.js":21,"../shared/poorlyfills.js":23,"../shared/utils.js":25,"./render.js":13}],15:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -3981,7 +4030,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./3rd/domdiff.js":8,"./classes/Component.js":10,"./hyper/render.js":12,"./hyper/wire.js":13,"./objects/Intent.js":15}],15:[function(require,module,exports){
+},{"./3rd/domdiff.js":9,"./classes/Component.js":11,"./hyper/render.js":13,"./hyper/wire.js":14,"./objects/Intent.js":16}],16:[function(require,module,exports){
 'use strict';
 const attributes = {};
 const intents = {};
@@ -4023,7 +4072,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -4083,7 +4132,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":19}],17:[function(require,module,exports){
+},{"../shared/constants.js":20}],18:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -4166,7 +4215,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -4690,7 +4739,7 @@ function observe() {
   }
 }
 
-},{"../3rd/domdiff.js":8,"../classes/Component.js":10,"../classes/Wire.js":11,"../shared/constants.js":19,"../shared/easy-dom.js":20,"../shared/poorlyfills.js":22,"../shared/utils.js":24,"./Intent.js":15,"./Path.js":16,"./Style.js":17}],19:[function(require,module,exports){
+},{"../3rd/domdiff.js":9,"../classes/Component.js":11,"../classes/Wire.js":12,"../shared/constants.js":20,"../shared/easy-dom.js":21,"../shared/poorlyfills.js":23,"../shared/utils.js":25,"./Intent.js":16,"./Path.js":17,"./Style.js":18}],20:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -4735,7 +4784,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -4747,7 +4796,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -4774,7 +4823,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":20}],22:[function(require,module,exports){
+},{"./easy-dom.js":21}],23:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -4848,7 +4897,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":19}],23:[function(require,module,exports){
+},{"./constants.js":20}],24:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -4873,7 +4922,7 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
@@ -5082,41 +5131,55 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":19,"./easy-dom.js":20,"./features-detection.js":21,"./poorlyfills.js":22,"./re.js":23}],25:[function(require,module,exports){
+},{"./constants.js":20,"./easy-dom.js":21,"./features-detection.js":22,"./poorlyfills.js":23,"./re.js":24}],26:[function(require,module,exports){
 "use strict";
 
 require("../js/io-filter-list");
 
-fetch("../tests/easylist.txt")
-      .then(b => b.text())
-      .then(text =>
-      {
-        const filters = text.replace(/^[![].*/gm, "").split("\n")
-                            .filter(line => line.trim().length)
-                            .map(line => ({
-                              disabled: Math.random() < 0.5,
-                              slow: Math.random() < 0.5,
-                              text: line
-                            }));
+const length = (Math.random() * 50) >>> 0;
+const ioFilterList = document.querySelector("io-filter-list");
+ioFilterList.filters = require("./random-filter-list")(length);
 
-        const ioFilterList = document.querySelector("io-filter-list");
-        ioFilterList.filters = filters.slice(0, (Math.random() * 50) >>> 0);
-        // triggered when a filter is set as enabled
-        ioFilterList.addEventListener("filter:enable", window.console.log);
-        // triggered when a filter is set as disabled
-        ioFilterList.addEventListener("filter:disable", window.console.log);
-        // triggered when a row (and a filter) is removed
-        ioFilterList.addEventListener("filter:remove", window.console.log);
-        // triggered when an edit is being performed
-        // if preventDefault() is invoked no update would ever happen
-        ioFilterList.addEventListener("filter:edit", (event) =>
-        {
-          // simulate a failure if the filter contains $$
-          if (/\$\$/.test(event.detail))
-            event.preventDefault();
-        });
-        // triggered when a filter is updated
-        ioFilterList.addEventListener("filter:update", window.console.log);
-      });
+// triggered when a filter is set as enabled
+ioFilterList.addEventListener("filter:enable", window.console.log);
+// triggered when a filter is set as disabled
+ioFilterList.addEventListener("filter:disable", window.console.log);
+// triggered when a row (and a filter) is removed
+ioFilterList.addEventListener("filter:remove", window.console.log);
+// triggered when an edit is being performed
+// if preventDefault() is invoked no update would ever happen
+ioFilterList.addEventListener("filter:edit", (event) =>
+{
+  // simulate a failure if the filter contains $$
+  if (/\$\$/.test(event.detail))
+    event.preventDefault();
+});
 
-},{"../js/io-filter-list":3}]},{},[25]);
+// triggered when a filter is updated
+ioFilterList.addEventListener("filter:update", window.console.log);
+
+},{"../js/io-filter-list":4,"./random-filter-list":27}],27:[function(require,module,exports){
+"use strict";
+
+module.exports = (amount = 50) =>
+{
+  const list = new Array(amount);
+  while (amount-- > 0)
+    list[amount] = {
+      disabled: Math.random() < 0.5,
+      slow: Math.random() < 0.5,
+      text: randomString()
+    };
+  return list;
+};
+
+function randomString()
+{
+  let length = 5 + Math.round(Math.random() * 45);
+  const output = new Array(length);
+  while (length-- > 0)
+    output[length] = String.fromCharCode(48 + Math.round(Math.random() * 74));
+  return output.join("");
+}
+
+},{}]},{},[26]);
