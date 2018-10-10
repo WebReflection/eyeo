@@ -182,7 +182,11 @@ io-filter-list td {
 
 io-filter-list th {
   padding: 8px;
-  cursor: pointer; }
+  cursor: pointer;
+  transition: background 0.3s ease-in; }
+
+io-filter-list th:hover {
+  background-color: #f6f6f6; }
 
 io-filter-list tbody tr {
   height: var(--row-height, auto);
@@ -204,18 +208,10 @@ io-filter-list [data-info="rule"] .content {
 io-filter-list [data-info="rule"] .content:focus {
   text-overflow: initial; }
 
-io-filter-list tr.invalid {
-  background-color: #f1d1d1; }
-
-io-filter-list tr.invalid [data-info="rule"] {
-  color: #c11d26; }
-
-html:not([dir="rtl"]) io-filter-list [data-info="rule"],
-html:not([dir="rtl"]) io-filter-list [data-info="status"] {
+html:not([dir="rtl"]) io-filter-list [data-info="rule"] {
   text-align: left; }
 
-html[dir="rtl"] io-filter-list [data-info="rule"],
-html[dir="rtl"] io-filter-list [data-info="status"] {
+html[dir="rtl"] io-filter-list [data-info="rule"] {
   text-align: right; }
 
 io-filter-list [data-info="status"],
@@ -266,8 +262,14 @@ io-filter-list:hover io-scrollbar {
 html:not([dir="rtl"]) io-filter-list io-scrollbar {
   right: 12px; }
 
+html:not([dir="rtl"]) io-filter-list thead th[data-info="status"]::after {
+  transform: translateX(-1em); }
+
 html[dir="rtl"] io-filter-list io-scrollbar {
   left: 12px; }
+
+html[dir="rtl"] io-filter-list thead th[data-info="status"]::after {
+  transform: translateX(1em); }
 
 io-filter-list io-toggle {
   margin-top: 2px;

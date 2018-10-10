@@ -1,8 +1,5 @@
 {
   "options_filter_list_rule": {
     "message": "Filter rule"
-  },
-  "options_filterList_column_status": {
-    "message": "Status"
   }
 }

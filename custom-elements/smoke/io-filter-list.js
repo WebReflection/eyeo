@@ -338,6 +338,8 @@ const {utils, wire} = IOElement;
 
 const {$, $$} = require("./dom");
 
+const beforeEdit = new WeakMap();
+
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
 {
@@ -529,23 +531,87 @@ class IOFilterList extends IOElement
   {
     const update = event.key === "Enter" || event.type === "blur";
     const {currentTarget} = event;
-    if (update)
-      currentTarget.blur();
+    const {title} = currentTarget;
     const text = currentTarget.textContent.trim();
-    if (dispatch.call(this, "edit", text).defaultPrevented)
-    {
-      currentTarget.closest("tr").classList.add("invalid");
+    const filter = this.filters.find(item => item.text === title);
+
+    // update filter and title
+    filter.text = text;
+    currentTarget.title = text;
+
+    // store the initial filter value once
+    // needed to remove the filter once finished the editing
+    if (!beforeEdit.has(filter))
+      beforeEdit.set(filter, title);
+
+    // do something only if there is something to do
+    if (beforeEdit.get(filter) === text)
       return;
-    }
-    currentTarget.closest("tr").classList.remove("invalid");
+
+    // add + remove the filter on Enter / update
     if (update)
     {
-      const {title} = currentTarget;
-      const filter = this.filters.find(item => item.text === title);
-      filter.text = text;
-      dispatch.call(this, "update", filter);
-      this.render();
+      // drop any validation action at distance
+      this._validating = 0;
+      // try adding the filter before removing the old one
+      browser.runtime.sendMessage({
+        type: "filters.add",
+        text
+      }).then(errors =>
+      {
+        if (errors.length)
+        {
+          filter.reason = errors[0];
+          this.render();
+          return;
+        }
+        // no errors, we can drop the old filter too
+        browser.runtime.sendMessage({
+          type: "filters.remove",
+          text: beforeEdit.get(filter)
+        }).then(() =>
+        {
+          // update the saved filter text
+          beforeEdit.set(filter, text);
+          delete filter.reason;
+        });
+      });
     }
+
+    // don't overload validation
+    if (this._validating > 0)
+    {
+      // but signal there is more validation to do
+      this._validating++;
+    }
+    this._validating = 1;
+    browser.runtime.sendMessage({
+      type: "filters.importRaw",
+      includeHeaderErrors: true,
+      text
+    }).then(errors =>
+    {
+      // in case a save operation has been asked in the meanwhile
+      if (this._validating < 1)
+        return;
+      // if there were more validation requests
+      if (this._validating > 1)
+      {
+        // reset the counter
+        this._validating = 0;
+        // re-trigger the event with same target
+        this.onkeyup({currentTarget});
+        return;
+      }
+      const {reason} = filter;
+      if (errors.length)
+        filter.reason = errors[0];
+      else
+        delete filter.reason;
+      // render only if there's something different to show
+      if (reason !== filter.reason)
+        this.render();
+    });
   }
 
   onblur(event)
@@ -651,6 +717,20 @@ class IOFilterList extends IOElement
     this.postRender(list);
   }
 
+  sortBy(type, ascOrDesc)
+  {
+    const th = $(`th[data-info="${type}"]`, this);
+    if (!th)
+      return;
+    const {sort} = this.state;
+    sort.current = type;
+    // sort.asc is flipped with current state
+    // so set the one that is not desired
+    sort.asc = /^desc$/i.test(ascOrDesc);
+    // before triggering the event
+    th.click();
+  }
+
   updateScrollbar()
   {
     const {rowHeight, viewHeight} = this.state;
@@ -707,11 +787,13 @@ function getRow(filter, i)
     </tr>`;
 }
 
+const issues = new WeakMap();
 const createIssue = (filter) =>
 {
   const issue = new Image();
-  issue.src = "icons/alert.svg";
+  issue.src = "icons/error.svg";
   issue.title = browser.i18n.getMessage(filter.reason);
+  issues.set(filter, issue);
   return issue;
 };
 
@@ -724,21 +806,10 @@ const createWarning = (filter) =>
   return warning;
 };
 
-function dispatch(info, detail)
-{
-  const event = new CustomEvent(`filter:${info}`, {
-    detail,
-    bubbles: true,
-    cancelable: true
-  });
-  this.dispatchEvent(event);
-  return event;
-}
-
 function getWarning(filter)
 {
   if (filter.reason)
-    return createIssue(filter);
+    return issues.get(filter) || createIssue(filter);
   if (filter.slow)
     return warnings.get(filter) || createWarning(filter);
   return "";
@@ -5142,24 +5213,6 @@ const length = (Math.random() * 50) >>> 0;
 const ioFilterList = document.querySelector("io-filter-list");
 ioFilterList.filters = require("./random-filter-list")(length);
 
-// triggered when a filter is set as enabled
-ioFilterList.addEventListener("filter:enable", window.console.log);
-// triggered when a filter is set as disabled
-ioFilterList.addEventListener("filter:disable", window.console.log);
-// triggered when a row (and a filter) is removed
-ioFilterList.addEventListener("filter:remove", window.console.log);
-// triggered when an edit is being performed
-// if preventDefault() is invoked no update would ever happen
-ioFilterList.addEventListener("filter:edit", (event) =>
-{
-  // simulate a failure if the filter contains $$
-  if (/\$\$/.test(event.detail))
-    event.preventDefault();
-});
-
-// triggered when a filter is updated
-ioFilterList.addEventListener("filter:update", window.console.log);
-
 },{"../js/io-filter-list":4,"./random-filter-list":27}],27:[function(require,module,exports){
 "use strict";
 
@@ -5167,11 +5220,14 @@ module.exports = (amount = 50) =>
 {
   const list = new Array(amount);
   while (amount-- > 0)
+  {
+    const text = randomString();
     list[amount] = {
       disabled: Math.random() < 0.5,
-      slow: Math.random() < 0.5,
-      text: randomString()
+      slow: text.indexOf("/") > -1,
+      text
     };
+  }
   return list;
 };
 
