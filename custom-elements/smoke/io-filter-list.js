@@ -491,7 +491,9 @@ class IOFilterList extends IOElement
     if (info === "selected")
     {
       const ioCheckbox = event.target.closest("io-checkbox");
-      this.selected = ioCheckbox.checked ? this.filters : [];
+      // ignore clicks outside the io-checkbox
+      if (ioCheckbox)
+        this.selected = ioCheckbox.checked ? this.filters : [];
       return;
     }
     event.preventDefault();

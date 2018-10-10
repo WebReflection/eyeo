@@ -230,25 +230,25 @@ io-filter-list [data-info="warning"] img {
 io-filter-list td[data-info="warning"] img {
   opacity: 0.5; }
 
-io-filter-list thead th::after {
+io-filter-list thead th:not([data-info="selected"])::after {
   display: inline-block;
-  visibility: hidden;
   position: absolute;
   padding: 4px;
+  opacity: 0.3;
   font-size: 8px;
   font-size: 0.7em;
   line-height: 1em; }
 
-io-filter-list thead[data-dir="asc"] th::after {
+io-filter-list thead th:not([data-info="selected"])::after {
   content: "▲"; }
 
-io-filter-list thead[data-dir="desc"] th::after {
+io-filter-list thead[data-dir="desc"] th:not([data-info="selected"])::after {
   content: "▼"; }
 
 io-filter-list thead[data-sort="status"] th[data-info="status"]::after,
 io-filter-list thead[data-sort="rule"] th[data-info="rule"]::after,
 io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after {
-  visibility: visible; }
+  opacity: 1; }
 
 io-filter-list table {
   position: relative; }
