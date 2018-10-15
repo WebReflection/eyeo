@@ -183,7 +183,7 @@ io-filter-list td {
 io-filter-list th {
   padding: 8px;
   cursor: pointer;
-  transition: background 0.3s ease-in; }
+  transition: background 0.2s ease-in; }
 
 io-filter-list th:hover {
   background-color: #f6f6f6; }
@@ -235,6 +235,9 @@ io-filter-list thead th:not([data-info="selected"])::after {
   font-size: 0.7em;
   line-height: 1em; }
 
+io-filter-list thead th[data-info="status"]::after {
+  position: initial; }
+
 io-filter-list thead th:not([data-info="selected"])::after {
   content: "▲"; }
 
@@ -262,14 +265,8 @@ io-filter-list:hover io-scrollbar {
 html:not([dir="rtl"]) io-filter-list io-scrollbar {
   right: 12px; }
 
-html:not([dir="rtl"]) io-filter-list thead th[data-info="status"]::after {
-  transform: translateX(-1em); }
-
 html[dir="rtl"] io-filter-list io-scrollbar {
   left: 12px; }
-
-html[dir="rtl"] io-filter-list thead th[data-info="status"]::after {
-  transform: translateX(1em); }
 
 io-filter-list io-toggle {
   margin-top: 2px;

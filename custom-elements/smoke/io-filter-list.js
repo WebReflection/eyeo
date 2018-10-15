@@ -338,7 +338,7 @@ const {utils, wire} = IOElement;
 
 const {$, $$} = require("./dom");
 
-const beforeEdit = new WeakMap();
+const initialFiltersText = new WeakMap();
 
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
@@ -541,11 +541,11 @@ class IOFilterList extends IOElement
 
     // store the initial filter value once
     // needed to remove the filter once finished the editing
-    if (!beforeEdit.has(filter))
-      beforeEdit.set(filter, title);
+    if (!initialFiltersText.has(filter))
+      initialFiltersText.set(filter, title);
 
     // do something only if there is something to do
-    if (beforeEdit.get(filter) === text)
+    if (initialFiltersText.get(filter) === text)
       return;
 
     // add + remove the filter on Enter / update
@@ -555,8 +555,9 @@ class IOFilterList extends IOElement
       this._validating = 0;
       // try adding the filter before removing the old one
       browser.runtime.sendMessage({
-        type: "filters.add",
-        text
+        type: "filters.replace",
+        old: initialFiltersText.get(filter),
+        new: text
       }).then(errors =>
       {
         if (errors.length)
@@ -565,16 +566,8 @@ class IOFilterList extends IOElement
           this.render();
           return;
         }
-        // no errors, we can drop the old filter too
-        browser.runtime.sendMessage({
-          type: "filters.remove",
-          text: beforeEdit.get(filter)
-        }).then(() =>
-        {
-          // update the saved filter text
-          beforeEdit.set(filter, text);
-          delete filter.reason;
-        });
+        initialFiltersText.set(filter, text);
+        delete filter.reason;
       });
     }
 
@@ -583,10 +576,11 @@ class IOFilterList extends IOElement
     {
       // but signal there is more validation to do
       this._validating++;
+      return;
     }
     this._validating = 1;
     browser.runtime.sendMessage({
-      type: "filters.importRaw",
+      type: "filters.validate",
       includeHeaderErrors: true,
       text
     }).then(errors =>
@@ -717,7 +711,7 @@ class IOFilterList extends IOElement
     this.postRender(list);
   }
 
-  sortBy(type, ascOrDesc)
+  sortBy(type, isAscending)
   {
     const th = $(`th[data-info="${type}"]`, this);
     if (!th)
@@ -726,7 +720,7 @@ class IOFilterList extends IOElement
     sort.current = type;
     // sort.asc is flipped with current state
     // so set the one that is not desired
-    sort.asc = /^desc$/i.test(ascOrDesc);
+    sort.asc = !isAscending;
     // before triggering the event
     th.click();
   }
