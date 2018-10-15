@@ -233,7 +233,7 @@ io-filter-list thead th:not([data-info="selected"])::after {
   opacity: 0.3;
   font-size: 8px;
   font-size: 0.7em;
-  line-height: 1em; }
+  line-height: 1rem; }
 
 io-filter-list thead th[data-info="status"]::after {
   position: initial; }
@@ -271,9 +271,3 @@ html[dir="rtl"] io-filter-list io-scrollbar {
 io-filter-list io-toggle {
   margin-top: 2px;
   vertical-align: top; }
-
-html:not([dir="rtl"]) io-filter-list io-toggle {
-  margin-right: 8px; }
-
-html[dir="rtl"] io-filter-list io-toggle {
-  margin-left: 8px; }

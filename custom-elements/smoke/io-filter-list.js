@@ -336,9 +336,9 @@ const IOScrollbar = require("./io-scrollbar");
 
 const {utils, wire} = IOElement;
 
-const {$, $$} = require("./dom");
+const {$} = require("./dom");
 
-const initialFiltersText = new WeakMap();
+const prevFilterText = new WeakMap();
 
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
@@ -523,17 +523,33 @@ class IOFilterList extends IOElement
 
   onkeydown(event)
   {
-    if (event.key === "Enter")
+    const {key} = event;
+    if (key === "Enter" || key === "Escape")
+    {
       event.preventDefault();
+      if (key === "Escape" && this._filter)
+      {
+        const {currentTarget} = event;
+        const text = prevFilterText.get(this._filter) || this._filter.text;
+        currentTarget.textContent = text;
+        currentTarget.blur();
+        this._filter = null;
+      }
+    }
   }
 
   onkeyup(event)
   {
-    const update = event.key === "Enter" || event.type === "blur";
+    const isEnter = event.key === "Enter";
+    const update = isEnter || event.type === "blur";
     const {currentTarget} = event;
     const {title} = currentTarget;
     const text = currentTarget.textContent.trim();
-    const filter = this.filters.find(item => item.text === title);
+    const filter = this._filter;
+
+    // if triggered but there was focus lost already: return
+    if (!filter)
+      return;
 
     // update filter and title
     filter.text = text;
@@ -541,11 +557,11 @@ class IOFilterList extends IOElement
 
     // store the initial filter value once
     // needed to remove the filter once finished the editing
-    if (!initialFiltersText.has(filter))
-      initialFiltersText.set(filter, title);
+    if (!prevFilterText.has(filter))
+      prevFilterText.set(filter, title);
 
     // do something only if there is something to do
-    if (initialFiltersText.get(filter) === text)
+    if (prevFilterText.get(filter) === text)
       return;
 
     // add + remove the filter on Enter / update
@@ -553,22 +569,28 @@ class IOFilterList extends IOElement
     {
       // drop any validation action at distance
       this._validating = 0;
-      // try adding the filter before removing the old one
-      browser.runtime.sendMessage({
-        type: "filters.replace",
-        old: initialFiltersText.get(filter),
-        new: text
-      }).then(errors =>
+      // verify there are no other filters already like this one
+      const index = this.filters.findIndex(
+        item => item !== filter && item.text === text
+      );
+      // if there is one, drop it before replacing the current one
+      if (index > -1)
       {
-        if (errors.length)
-        {
-          filter.reason = errors[0];
-          this.render();
-          return;
-        }
-        initialFiltersText.set(filter, text);
-        delete filter.reason;
-      });
+        // drop the known filter and update the view
+        this.filters.splice(index, 1);
+        this.render();
+        // remove the old one, then replace the current one
+        browser.runtime.sendMessage({
+          type: "filters.remove",
+          text
+        }).then(replaceFilter.bind(this, filter));
+      }
+      // in every other case, replace the current filter
+      else
+        replaceFilter.call(this, filter);
+      if (isEnter)
+        focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
+      return;
     }
 
     // don't overload validation
@@ -581,7 +603,6 @@ class IOFilterList extends IOElement
     this._validating = 1;
     browser.runtime.sendMessage({
       type: "filters.validate",
-      includeHeaderErrors: true,
       text
     }).then(errors =>
     {
@@ -608,9 +629,20 @@ class IOFilterList extends IOElement
     });
   }
 
+  onfocus(event)
+  {
+    const {currentTarget} = event;
+    const {title} = currentTarget;
+    this._filter = this.filters.find(item => item.text === title);
+  }
+
   onblur(event)
   {
-    this.onkeyup(event);
+    if (event.isTrusted)
+    {
+      this.onkeyup(event);
+      this._filter = null;
+    }
   }
 
   onchange(event)
@@ -763,6 +795,7 @@ function getRow(filter, i)
           title="${filter.text}"
           onkeydown="${this}"
           onkeyup="${this}"
+          onfocus="${this}"
           onblur="${this}"
         >${filter.text}</div>
       </td>
@@ -786,7 +819,7 @@ const createIssue = (filter) =>
 {
   const issue = new Image();
   issue.src = "icons/error.svg";
-  issue.title = browser.i18n.getMessage(filter.reason);
+  issue.title = filter.reason;
   issues.set(filter, issue);
   return issue;
 };
@@ -800,6 +833,24 @@ const createWarning = (filter) =>
   return warning;
 };
 
+function focusTheNextFilterIfAny(tr)
+{
+  const i = this.filters.indexOf(this._filter) + 1;
+  if (i < this.filters.length)
+  {
+    const next = tr.nextElementSibling;
+    const {rowHeight, scrollTop, viewHeight} = this.state;
+    $(".content", tr).blur();
+    if (next.offsetTop > viewHeight)
+    {
+      this.setState({
+        scrollTop: scrollTop + rowHeight
+      });
+    }
+    $(".content", next).focus();
+  }
+}
+
 function getWarning(filter)
 {
   if (filter.reason)
@@ -807,6 +858,26 @@ function getWarning(filter)
   if (filter.slow)
     return warnings.get(filter) || createWarning(filter);
   return "";
+}
+
+function replaceFilter(filter)
+{
+  const {text} = filter;
+  browser.runtime.sendMessage({
+    type: "filters.replace",
+    old: prevFilterText.get(filter),
+    new: text
+  }).then(errors =>
+  {
+    if (errors.length)
+    {
+      filter.reason = errors[0];
+      this.render();
+      return;
+    }
+    prevFilterText.set(filter, text);
+    delete filter.reason;
+  });
 }
 
 function setScrollbarReactiveOpacity()
