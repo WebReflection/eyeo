@@ -562,32 +562,18 @@ class IOFilterList extends IOElement
 
     // do something only if there is something to do
     if (prevFilterText.get(filter) === text)
+    {
+      if (isEnter)
+        focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
       return;
+    }
 
     // add + remove the filter on Enter / update
     if (update)
     {
       // drop any validation action at distance
       this._validating = 0;
-      // verify there are no other filters already like this one
-      const index = this.filters.findIndex(
-        item => item !== filter && item.text === text
-      );
-      // if there is one, drop it before replacing the current one
-      if (index > -1)
-      {
-        // drop the known filter and update the view
-        this.filters.splice(index, 1);
-        this.render();
-        // remove the old one, then replace the current one
-        browser.runtime.sendMessage({
-          type: "filters.remove",
-          text
-        }).then(replaceFilter.bind(this, filter));
-      }
-      // in every other case, replace the current filter
-      else
-        replaceFilter.call(this, filter);
+      replaceFilter.call(this, filter, currentTarget);
       if (isEnter)
         focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
       return;
@@ -631,60 +617,62 @@ class IOFilterList extends IOElement
 
   onfocus(event)
   {
-    const {currentTarget} = event;
-    const {title} = currentTarget;
-    this._filter = this.filters.find(item => item.text === title);
+    this._filter = event.currentTarget.data;
   }
 
   onblur(event)
   {
-    if (event.isTrusted)
-    {
-      this.onkeyup(event);
-      this._filter = null;
-    }
+    if (this._changingFocus)
+      return;
+    this.onkeyup(event);
+    this._filter = null;
   }
 
-  onchange(event)
+  // used in the checkbox of the selected column only
+  onclick(event)
   {
-    const el = event.currentTarget;
-    const div = $('td[data-info="rule"] > .content', el.closest("tr"));
-    const {textContent} = div;
+    const filter = getFilter(event);
     const {filters} = this;
-    const filter = filters.find(item => item.text === textContent);
-    switch (el.closest("td").dataset.info)
+    if (event.shiftKey && this.selected.size)
     {
-      case "selected":
-        if (event.shiftKey && this.selected.size)
-        {
-          let start = filters.indexOf(this._lastFilter);
-          const end = filters.indexOf(filter);
-          const method = this.selected.has(this._lastFilter) ?
+      let start = filters.indexOf(this._lastFilter);
+      const end = filters.indexOf(filter);
+      const method = this.selected.has(this._lastFilter) ?
                           "add" :
                           "delete";
-          if (start < end)
-          {
-            while (start++ < end)
-              this.selected[method](filters[start]);
-          }
-          else
-          {
-            while (start-- > end)
-              this.selected[method](filters[start]);
-          }
-        }
-        else
-        {
-          this._lastFilter = filter;
-          if (this.selected.has(filter))
-            this.selected.delete(filter);
-          else
-            this.selected.add(filter);
-        }
-        break;
-      case "status":
-        filter.disabled = !filter.disabled;
-        break;
+      if (start < end)
+      {
+        while (start++ < end)
+          this.selected[method](filters[start]);
+      }
+      else
+      {
+        while (start-- > end)
+          this.selected[method](filters[start]);
+      }
+    }
+    else
+    {
+      this._lastFilter = filter;
+      if (this.selected.has(filter))
+        this.selected.delete(filter);
+      else
+        this.selected.add(filter);
+    }
+    // render updated right after the checkbox changes
+  }
+
+  // used in both selectefd and status
+  // the selected needs it to render at the right time
+  // which is when the checkbox status changed
+  // not when it's clicked
+  onchange(event)
+  {
+    const td = event.currentTarget.closest("td");
+    if (td.dataset.info === "status")
+    {
+      const filter = getFilter(event);
+      filter.disabled = !filter.disabled;
     }
     this.render();
   }
@@ -734,7 +722,7 @@ class IOFilterList extends IOElement
         <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
         <th data-info="warning">${
           // for the header, just return always the same warning icon
-          warnings.get(this) || createWarning(this)
+          warnings.get(this) || createImageFor(warnings, this)
         }</th>
       </thead>
       <tbody>${list.map(getRow, this)}</tbody>
@@ -783,7 +771,10 @@ function getRow(filter, i)
     return wire(filter)`
     <tr class="${selected ? "selected" : ""}">
       <td data-info="selected">
-        <io-checkbox checked="${selected}" onchange="${this}" />
+        <io-checkbox
+          checked="${selected}"
+          onclick="${this}" onchange="${this}"
+        />
       </td>
       <td data-info="status">
         <io-toggle checked="${!filter.disabled}" onchange="${this}" />
@@ -797,6 +788,7 @@ function getRow(filter, i)
           onkeyup="${this}"
           onfocus="${this}"
           onblur="${this}"
+          data="${filter}"
         >${filter.text}</div>
       </td>
       <td data-info="warning">
@@ -814,23 +806,22 @@ function getRow(filter, i)
     </tr>`;
 }
 
+// used to show issues in the last column
 const issues = new WeakMap();
-const createIssue = (filter) =>
-{
-  const issue = new Image();
-  issue.src = "icons/error.svg";
-  issue.title = filter.reason;
-  issues.set(filter, issue);
-  return issue;
-};
 
+// used to show warnings in the last column
 const warnings = new WeakMap();
-const createWarning = (filter) =>
+
+// relate either issues or warnings to a filter
+const createImageFor = (weakMap, filter) =>
 {
-  const warning = new Image();
-  warning.src = "icons/alert.svg";
-  warnings.set(filter, warning);
-  return warning;
+  const isIssue = weakMap === issues;
+  const image = new Image();
+  image.src = `icons/${isIssue ? "error" : "alert"}.svg`;
+  if (isIssue)
+    image.title = filter.reason;
+  weakMap.set(filter, image);
+  return image;
 };
 
 function focusTheNextFilterIfAny(tr)
@@ -840,27 +831,47 @@ function focusTheNextFilterIfAny(tr)
   {
     const next = tr.nextElementSibling;
     const {rowHeight, scrollTop, viewHeight} = this.state;
-    $(".content", tr).blur();
+    // used to avoid race conditions with blur event
+    this._changingFocus = true;
+    // force eventually the scrollTop to make
+    // the next row visible
     if (next.offsetTop > viewHeight)
     {
       this.setState({
         scrollTop: scrollTop + rowHeight
       });
     }
+    // focus its content field
     $(".content", next).focus();
+    // set back the _changingFocus
+    this._changingFocus = false;
   }
+}
+
+function dropSavedClass(event)
+{
+  const {currentTarget} = event;
+  currentTarget.classList.remove("saved");
+  currentTarget.removeEventListener(event.type, dropSavedClass);
+}
+
+function getFilter(event)
+{
+  const el = event.currentTarget;
+  const div = $('td[data-info="rule"] > .content', el.closest("tr"));
+  return div.data;
 }
 
 function getWarning(filter)
 {
   if (filter.reason)
-    return issues.get(filter) || createIssue(filter);
+    return issues.get(filter) || createImageFor(issues, filter);
   if (filter.slow)
-    return warnings.get(filter) || createWarning(filter);
+    return warnings.get(filter) || createImageFor(warnings, filter);
   return "";
 }
 
-function replaceFilter(filter)
+function replaceFilter(filter, currentTarget)
 {
   const {text} = filter;
   browser.runtime.sendMessage({
@@ -877,6 +888,8 @@ function replaceFilter(filter)
     }
     prevFilterText.set(filter, text);
     delete filter.reason;
+    currentTarget.addEventListener("animationend", dropSavedClass);
+    currentTarget.classList.add("saved");
   });
 }
 
