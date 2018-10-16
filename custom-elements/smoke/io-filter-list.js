@@ -662,7 +662,7 @@ class IOFilterList extends IOElement
     // render updated right after the checkbox changes
   }
 
-  // used in both selectefd and status
+  // used in both selected and status
   // the selected needs it to render at the right time
   // which is when the checkbox status changed
   // not when it's clicked
@@ -5287,9 +5287,12 @@ const SVGFragment = hasContent ?
 
 require("../js/io-filter-list");
 
-const length = (Math.random() * 50) >>> 0;
-const ioFilterList = document.querySelector("io-filter-list");
-ioFilterList.filters = require("./random-filter-list")(length);
+window.addEventListener("load", () =>
+{
+  const length = (Math.random() * 50) >>> 0;
+  const ioFilterList = document.querySelector("io-filter-list");
+  ioFilterList.filters = require("./random-filter-list")(length);
+});
 
 },{"../js/io-filter-list":4,"./random-filter-list":27}],27:[function(require,module,exports){
 "use strict";
