@@ -271,17 +271,7 @@
     }
   });
 
-  port.on("filters.add", (message, sender) =>
-  {
-    const result = require("filterValidation").parseFilter(message.text);
-    const errors = [];
-    if (result.error)
-      errors.push(result.error.toString());
-    else if (result.filter)
-      FilterStorage.addFilter(result.filter);
-
-    return errors;
-  });
+  port.on("filters.add", filtersAdd);
 
   port.on("filters.blocked", (message, sender) =>
   {
@@ -343,17 +333,26 @@
     return errors;
   });
 
-  port.on("filters.remove", (message, sender) =>
-  {
-    const filter = Filter.fromText(message.text);
-    let subscription = null;
-    if (message.subscriptionUrl)
-      subscription = Subscription.fromURL(message.subscriptionUrl);
+  port.on("filters.remove", filtersRemove);
 
-    if (!subscription)
-      FilterStorage.removeFilter(filter);
-    else
-      FilterStorage.removeFilter(filter, subscription, message.index);
+  port.on("filters.replace", (message, sender) =>
+  {
+    const errors = filtersAdd({text: message.new}, sender);
+    if (errors.length)
+      return errors;
+    filtersRemove({text: message.old}, sender);
+    return [];
+  });
+
+  port.on("filters.validate", (message, sender) =>
+  {
+    const result = require("filterValidation").parseFilters(message.text);
+    const errors = [];
+    for (const error of result.errors)
+    {
+      errors.push(error.toString());
+    }
+    return errors;
   });
 
   port.on("prefs.get", (message, sender) =>
@@ -478,6 +477,31 @@
         Synchronizer.execute(subscription, true);
     }
   });
+
+  function filtersAdd(message, sender)
+  {
+    const result = require("filterValidation").parseFilter(message.text);
+    const errors = [];
+    if (result.error)
+      errors.push(result.error.toString());
+    else if (result.filter)
+      FilterStorage.addFilter(result.filter);
+
+    return errors;
+  }
+
+  function filtersRemove(message, sender)
+  {
+    const filter = Filter.fromText(message.text);
+    let subscription = null;
+    if (message.subscriptionUrl)
+      subscription = Subscription.fromURL(message.subscriptionUrl);
+
+    if (!subscription)
+      FilterStorage.removeFilter(filter);
+    else
+      FilterStorage.removeFilter(filter, subscription, message.index);
+  }
 
   function listen(type, filters, newFilter, message, senderTabId)
   {
