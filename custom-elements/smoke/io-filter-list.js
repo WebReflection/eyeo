@@ -271,6 +271,17 @@ class IOElement extends HyperHTMLElement
   // whenever an element is created, render its content once
   created() { this.render(); }
 
+  // based on a `--component-name: ready;` convention
+  // under the `component-name {}` related stylesheet,
+  // this method returns true only if such stylesheet
+  // has been already loaded.
+  isStyled()
+  {
+    const computed = window.getComputedStyle(this, null);
+    const property = "--" + this.nodeName.toLowerCase();
+    return computed.getPropertyValue(property).trim() === "ready";
+  }
+
   // by default, render is a no-op
   render() {}
 
@@ -398,6 +409,15 @@ class IOFilterList extends IOElement
 
   set filters(value)
   {
+    // if the related CSS is not loaded yet, this component cannot bootstrap
+    // because its TBODY will never be scrollable so there's no way
+    // to calculate its viewport height in pixels
+    // in such case, just execute later on until the CSS is parsed
+    if (!this.isStyled())
+    {
+      setTimeout(() => this.filters = value, 10);
+      return;
+    }
     this.selected = [];
     // clear any previous --rule-width info
     this.style.setProperty("--rule-width", "auto");
@@ -488,8 +508,6 @@ class IOFilterList extends IOElement
     if (!utils.event.isLeftClick(event) || !th)
       return;
     const {info} = th.dataset;
-    if (info === "remove")
-      return;
     if (info === "selected")
     {
       const ioCheckbox = event.target.closest("io-checkbox");
@@ -560,7 +578,7 @@ class IOFilterList extends IOElement
     if (!prevFilterText.has(filter))
       prevFilterText.set(filter, title);
 
-    // do something only if there is something to do
+    // avoid updating filters that didn't change
     if (prevFilterText.get(filter) === text)
     {
       if (isEnter)
@@ -2802,7 +2820,8 @@ class HyperHTMLElement extends HTMLElement {
     // Boolean attributes are also automatically observed.
     const booleanAttributes = Class.booleanAttributes || [];
     booleanAttributes.forEach(name => {
-      if (!(name in proto)) defineProperty(
+      if (!(name in proto))
+        defineProperty(
         proto,
         camel(name),
         {
@@ -2832,7 +2851,8 @@ class HyperHTMLElement extends HTMLElement {
     observedAttributes.forEach(name => {
       // it is possible to redefine the behavior at any time
       // simply overwriting get prop() and set prop(value)
-      if (!(name in proto)) defineProperty(
+      if (!(name in proto))
+        defineProperty(
         proto,
         camel(name),
         {
@@ -3042,7 +3062,8 @@ class HyperHTMLElement extends HTMLElement {
     const target = this.state;
     const source = typeof state === 'function' ? state.call(this, target) : state;
     for (const key in source) target[key] = source[key];
-    if (render !== false) this.render();
+    if (render !== false)
+      this.render();
     return this;
   }
 
@@ -3056,7 +3077,8 @@ HyperHTMLElement.wire = wire;
 HyperHTMLElement.hyper = hyper;
 
 try {
-  if (Symbol.hasInstance) classes.push(
+  if (Symbol.hasInstance)
+    classes.push(
     defineProperty(HyperHTMLElement, Symbol.hasInstance, {
       enumerable: false,
       configurable: true,
@@ -3091,13 +3113,20 @@ if (!dom.ready()) {
   document.addEventListener(dom.type, dom, false);
 }
 
+
+const dafuq = new WeakSet;
 function checkReady(created) {
   if (dom.ready() || isReady.call(this, created)) {
     if (this._init$) {
+      if (dafuq.has(this))
+        throw new Error('WTF');
+      dafuq.add(this);
       const list = this._init$$;
-      if (list) delete this._init$$;
+      if (list)
+        delete this._init$$;
       created.call(defineProperty(this, '_init$', {value: false}));
-      if (list) list.forEach(invoke);
+      if (list)
+        list.forEach(invoke);
     }
   } else {
     if (!this.hasOwnProperty('_init$$'))
@@ -5287,12 +5316,9 @@ const SVGFragment = hasContent ?
 
 require("../js/io-filter-list");
 
-window.addEventListener("load", () =>
-{
-  const length = (Math.random() * 50) >>> 0;
-  const ioFilterList = document.querySelector("io-filter-list");
-  ioFilterList.filters = require("./random-filter-list")(length);
-});
+const length = (Math.random() * 50) >>> 0;
+const ioFilterList = document.querySelector("io-filter-list");
+ioFilterList.filters = require("./random-filter-list")(length);
 
 },{"../js/io-filter-list":4,"./random-filter-list":27}],27:[function(require,module,exports){
 "use strict";

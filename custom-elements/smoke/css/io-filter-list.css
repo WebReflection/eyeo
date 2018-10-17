@@ -132,7 +132,14 @@ io-toggle button:focus,
 io-toggle button[aria-checked="true"]:focus {
   border: 2px solid #87bffe; }
 
+/*
+  The component depends on its style and it will look for the
+  --io-filter-list property to ensure the CSS has been loaded.
+  The property is also named like the component on purpose,
+  to be sure its an own property, not something inherited.
+*/
 io-filter-list {
+  --io-filter-list: ready;
   width: 100%;
   padding: 0; }
 
@@ -149,9 +156,6 @@ io-filter-list table {
 io-filter-list table {
   width: 100%;
   border: 1px solid #bcbcbc;
-  user-select: none; }
-
-io-filter-list thead {
   user-select: none; }
 
 io-filter-list thead tr,
@@ -235,7 +239,6 @@ io-filter-list thead th:not([data-info="selected"])::after {
   position: absolute;
   padding: 4px;
   opacity: 0.3;
-  font-size: 8px;
   font-size: 0.7em;
   line-height: 1rem; }
 
