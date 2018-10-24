@@ -205,13 +205,13 @@
           throw new Error('nope');
         }
       },
-      function writableVariables() {
+      function setVariables() {
         document.body.style.setProperty('--unknown-variable', 200);
         document.body.offsetHeight;
         if (getComputedStyle(document.body, null).getPropertyValue('--unknown-variable') != 200)
           throw new Error('nope');
       },
-      function overwritableVariables() {
+      function writableVariables() {
         document.body.style.setProperty('--variable', 200);
         document.body.offsetHeight;
         if (getComputedStyle(document.body, null).getPropertyValue('--variable') != 200)
