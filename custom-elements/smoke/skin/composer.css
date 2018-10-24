@@ -15,18 +15,61 @@
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* 
-  Used for translatable screen reader only content.
-  e.g.: Use instead of aria-label to avoid complex attribute value translation
-*/
-.sr-only
+*
 {
-  clip: rect(0, 0, 0, 0);
-  overflow: hidden;
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0px;
-  border: 0px;
+  box-sizing: border-box;
+}
+
+html
+{
+  height: 100%;
+}
+
+body
+{
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0px;
+  padding: 5px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+#title,
+#filters
+{
+  margin-bottom: 3px;
+}
+
+#title > *
+{
+  vertical-align: middle;
+}
+
+#title > img
+{
+  width: 32px;
+  height: 32px;
+  margin-right: 5px;
+}
+
+#title,
+#buttons
+{
+  flex-shrink: 0;
+}
+
+#filters
+{
+  flex-grow: 1;
+  width: 100%;
+  white-space: pre;
+  word-wrap: normal;
+  resize: none;
+}
+
+#buttons
+{
+  text-align: right;
 }

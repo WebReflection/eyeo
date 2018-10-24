@@ -100,6 +100,75 @@ module.exports = {
 
 "use strict";
 
+const IOElement = require("./io-element");
+
+class IOCheckbox extends IOElement
+{
+  static get booleanAttributes()
+  {
+    return ["checked", "disabled"];
+  }
+
+  attributeChangedCallback()
+  {
+    this.render();
+  }
+
+  created()
+  {
+    this.addEventListener("click", this);
+    this.render();
+  }
+
+  onclick(event)
+  {
+    if (!this.disabled)
+    {
+      this.checked = !this.checked;
+      this.dispatchEvent(new CustomEvent("change", {
+        bubbles: true,
+        cancelable: true,
+        detail: this.checked
+      }));
+    }
+  }
+
+  render()
+  {
+    this.html`
+    <button
+      role="checkbox"
+      disabled="${this.disabled}"
+      aria-checked="${this.checked}"
+      aria-disabled="${this.disabled}"
+    />`;
+  }
+}
+
+IOCheckbox.define("io-checkbox");
+
+module.exports = IOCheckbox;
+
+},{"./io-element":3}],3:[function(require,module,exports){
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+"use strict";
+
 // Custom Elements ponyfill (a polyfill triggered on demand)
 const customElementsPonyfill = require("document-register-element/pony");
 if (typeof customElements !== "object")
@@ -202,6 +271,17 @@ class IOElement extends HyperHTMLElement
   // whenever an element is created, render its content once
   created() { this.render(); }
 
+  // based on a `--component-name: ready;` convention
+  // under the `component-name {}` related stylesheet,
+  // this method returns true only if such stylesheet
+  // has been already loaded.
+  isStyled()
+  {
+    const computed = window.getComputedStyle(this, null);
+    const property = "--" + this.nodeName.toLowerCase();
+    return computed.getPropertyValue(property).trim() === "ready";
+  }
+
   // by default, render is a no-op
   render() {}
 
@@ -239,7 +319,7 @@ IOElement.intent("i18n", id =>
 
 module.exports = IOElement;
 
-},{"document-register-element/pony":8,"hyperhtml-element/cjs":9}],3:[function(require,module,exports){
+},{"document-register-element/pony":9,"hyperhtml-element/cjs":10}],4:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -259,13 +339,23 @@ module.exports = IOElement;
 
 "use strict";
 
+require("./io-checkbox");
 require("./io-toggle");
 
 const IOElement = require("./io-element");
 const IOScrollbar = require("./io-scrollbar");
+
 const {utils, wire} = IOElement;
 
-const {$, $$} = require("./dom");
+const {$} = require("./dom");
+
+const prevFilterText = new WeakMap();
+
+const port = browser.runtime.connect({name: "ui"});
+port.postMessage({
+  type: "filters.listen",
+  filter: ["disabled"]
+});
 
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
@@ -285,7 +375,6 @@ class IOFilterList extends IOElement
   {
     return {
       infinite: false,
-      contentEditable: false,
       filters: [],
       viewHeight: 0,
       rowHeight: 0,
@@ -293,12 +382,11 @@ class IOFilterList extends IOElement
       scrollHeight: 0,
       tbody: null,
       sort: {
-        status: false,
-        rule: false,
-        warning: false
+        current: "",
+        asc: false
       },
       sortMap: {
-        status: "enabled",
+        status: "disabled",
         rule: "text",
         warning: "slow"
       }
@@ -318,7 +406,6 @@ class IOFilterList extends IOElement
   set disabled(value)
   {
     utils.boolean.attribute(this, "disabled", value);
-    this.setState({contentEditable: !this.disabled});
   }
 
   get filters()
@@ -328,23 +415,35 @@ class IOFilterList extends IOElement
 
   set filters(value)
   {
+    // if the related CSS is not loaded yet, this component cannot bootstrap
+    // because its TBODY will never be scrollable so there's no way
+    // to calculate its viewport height in pixels
+    // in such case, just execute later on until the CSS is parsed
+    if (!this.isStyled())
+    {
+      this._filters = value;
+      window.addEventListener("load", this);
+      return;
+    }
     this.selected = [];
+    // clear any previous --rule-width info
+    this.style.setProperty("--rule-width", "auto");
     // render one row only for the setup
-    this.setState({
-      infinite: false,
-      filters: []
-    });
+    this.setState({infinite: false, filters: []});
+    // set current flex grown rule column
+    this.style.setProperty(
+      "--rule-width",
+      $('[data-column="rule"]', this).clientWidth + "px"
+    );
     // if filters have more than a row
     // prepare the table with a new state
     if (value.length)
     {
-      setupTable.call(this);
       const tbody = $("tbody", this);
       const rowHeight = $("tr", tbody).clientHeight;
       const viewHeight = tbody.clientHeight;
       this.setState({
         infinite: true,
-        contentEditable: !this.disabled,
         filters: value,
         scrollTop: tbody.scrollTop,
         scrollHeight: rowHeight * (value.length + 1) - viewHeight,
@@ -361,6 +460,7 @@ class IOFilterList extends IOElement
 
   created()
   {
+    setupPort.call(this);
     this.scrollbar = new IOScrollbar();
     this.scrollbar.direction = "vertical";
     this.scrollbar.addEventListener("scroll", () =>
@@ -368,7 +468,7 @@ class IOFilterList extends IOElement
       const {position, range} = this.scrollbar;
       const {scrollHeight} = this.state;
       this.setState({
-        scrollTop: scrollHeight * position / range
+        scrollTop: getScrollTop(scrollHeight * position / range)
       });
     });
     this.addEventListener(
@@ -385,10 +485,7 @@ class IOFilterList extends IOElement
         }
         const {scrollHeight, scrollTop} = this.state;
         this.setState({
-          scrollTop: Math.max(
-            0,
-            Math.min(scrollHeight, scrollTop + event.deltaY)
-          )
+          scrollTop: getScrollTop(scrollTop + event.deltaY, scrollHeight)
         });
         // update the scrollbar position accordingly
         const {range} = this.scrollbar;
@@ -396,17 +493,29 @@ class IOFilterList extends IOElement
       },
       {passive: false}
     );
+    setScrollbarReactiveOpacity.call(this);
   }
 
   scrollTo(row)
   {
     const {rowHeight, scrollHeight} = this.state;
-    this.setState({
-      scrollTop: Math.min(
-        scrollHeight,
-        this.filters.findIndex(filter => filter === row) * rowHeight
-      )
-    });
+    const index = typeof row === "string" ?
+      this.filters.findIndex(filter => filter.text === row) :
+      this.filters.findIndex(filter => filter === row);
+    if (index < 0)
+      console.error("invalid filter", row);
+    else
+    {
+      this.setState({
+        scrollTop: getScrollTop(index * rowHeight, scrollHeight)
+      });
+    }
+  }
+
+  onload()
+  {
+    window.removeEventListener("load", this);
+    this.filters = this._filters;
   }
 
   onheaderclick(event)
@@ -414,188 +523,203 @@ class IOFilterList extends IOElement
     const th = event.target.closest("th");
     if (!utils.event.isLeftClick(event) || !th)
       return;
-    const {info} = th.dataset;
-    if (info === "remove")
-      return;
-    if (info === "selected")
+    const {column} = th.dataset;
+    if (column === "selected")
     {
-      this.selected = event.target.checked ? this.filters : [];
+      const ioCheckbox = event.target.closest("io-checkbox");
+      // ignore clicks outside the io-checkbox
+      if (ioCheckbox)
+        this.selected = ioCheckbox.checked ? this.filters : [];
       return;
     }
     event.preventDefault();
     const {sort, sortMap} = this.state;
-    sort[info] = !sort[info];
-    const sorter = sort[info] ? 1 : -1;
-    const property = sortMap[info];
+    if (column !== sort.current)
+    {
+      sort.current = column;
+      sort.asc = false;
+    }
+    sort.asc = !sort.asc;
+    const sorter = sort.asc ? 1 : -1;
+    const property = sortMap[column];
+    const direction = property === "slow" ? -1 : 1;
     this.filters.sort((fa, fb) =>
     {
       if (fa[property] === fb[property])
         return 0;
-      return fa[property] < fb[property] ? -sorter : sorter;
+      return (fa[property] < fb[property] ? -sorter : sorter) * direction;
     });
     this.render();
-    th.closest("thead").dataset.sort = info;
-    th.closest("thead").dataset.dir = sort[info] ? "asc" : "desc";
+    const dataset = th.closest("thead").dataset;
+    dataset.sort = column;
+    dataset.dir = sort.asc ? "asc" : "desc";
   }
 
   onkeydown(event)
   {
-    if (event.key === "Enter")
+    const {key} = event;
+    if (key === "Enter" || key === "Escape")
+    {
       event.preventDefault();
+      if (key === "Escape" && this._filter)
+      {
+        const {currentTarget} = event;
+        const text = prevFilterText.get(this._filter) || this._filter.text;
+        currentTarget.textContent = text;
+        currentTarget.blur();
+        this._filter = null;
+      }
+    }
   }
 
   onkeyup(event)
   {
-    const update = event.key === "Enter" || event.type === "blur";
+    const isEnter = event.key === "Enter";
+    const update = isEnter || event.type === "blur";
     const {currentTarget} = event;
-    if (update)
-      currentTarget.blur();
+    const {title} = currentTarget;
     const text = currentTarget.textContent.trim();
-    if (dispatch.call(this, "edit", text).defaultPrevented)
+    const filter = this._filter;
+
+    // if triggered but there was focus lost already: return
+    if (!filter)
+      return;
+
+    // update filter and title
+    filter.text = text;
+    currentTarget.title = text;
+
+    // store the initial filter value once
+    // needed to remove the filter once finished the editing
+    if (!prevFilterText.has(filter))
+      prevFilterText.set(filter, title);
+
+    // avoid updating filters that didn't change
+    if (prevFilterText.get(filter) === text)
     {
-      currentTarget.closest("tr").classList.add("invalid");
+      if (isEnter)
+        focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
       return;
     }
-    currentTarget.closest("tr").classList.remove("invalid");
+
+    // add + remove the filter on Enter / update
     if (update)
     {
-      const {title} = currentTarget;
-      const filter = this.filters.find(item => item.text === title);
-      filter.text = text;
-      dispatch.call(this, "update", filter);
-      this.render();
+      // drop any validation action at distance
+      this._validating = 0;
+      if (this.filters.some(f => f.text === filter.text && f !== filter))
+        dispatchError.call(this, "filter.duplicated", filter);
+      else
+      {
+        replaceFilter.call(this, filter, currentTarget);
+        if (isEnter)
+          focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
+      }
+      return;
     }
+
+    // don't overload validation
+    if (this._validating > 0)
+    {
+      // but signal there is more validation to do
+      this._validating++;
+      return;
+    }
+    this._validating = 1;
+    browser.runtime.sendMessage({
+      type: "filters.validate",
+      text
+    }).then(errors =>
+    {
+      // in case a save operation has been asked in the meanwhile
+      if (this._validating < 1)
+        return;
+      // if there were more validation requests
+      if (this._validating > 1)
+      {
+        // reset the counter
+        this._validating = 0;
+        // re-trigger the event with same target
+        this.onkeyup({currentTarget});
+        return;
+      }
+      const {reason} = filter;
+      if (errors.length)
+        filter.reason = errors[0];
+      else
+        delete filter.reason;
+      // render only if there's something different to show
+      if (reason !== filter.reason)
+        this.render();
+    });
+  }
+
+  onfocus(event)
+  {
+    this._filter = event.currentTarget.data;
   }
 
   onblur(event)
   {
-    /*
-    if (event.currentTarget.classList.contains("content"))
-      event.currentTarget.contentEditable = false;
-    */
+    if (this._changingFocus)
+      return;
     this.onkeyup(event);
+    this._filter = null;
   }
 
-  onchange(event)
+  // used in the checkbox of the selected column only
+  onclick(event)
   {
-    const el = event.currentTarget;
-    const div = $('td[data-info="rule"] > .content', el.closest("tr"));
-    const {textContent} = div;
+    const filter = getFilter(event);
     const {filters} = this;
-    const filter = filters.find(item => item.text === textContent);
-    switch (el.closest("td").dataset.info)
+    if (event.shiftKey && this.selected.size)
     {
-      case "selected":
-        if (event.shiftKey && this.selected.size)
-        {
-          let start = filters.indexOf(this._lastFilter);
-          const end = filters.indexOf(filter);
-          const method = this.selected.has(this._lastFilter) ?
+      let start = filters.indexOf(this._lastFilter);
+      const end = filters.indexOf(filter);
+      const method = this.selected.has(this._lastFilter) ?
                           "add" :
                           "delete";
-          if (start < end)
-          {
-            while (start++ < end)
-              this.selected[method](filters[start]);
-          }
-          else
-          {
-            while (start-- > end)
-              this.selected[method](filters[start]);
-          }
-        }
-        else
-        {
-          this._lastFilter = filter;
-          if (this.selected.has(filter))
-            this.selected.delete(filter);
-          else
-            this.selected.add(filter);
-        }
-        break;
-      case "status":
-        filter.enabled = !filter.enabled;
-        break;
-    }
-    this.render();
-  }
-
-  onmousedown(event)
-  {
-    $(".content", event.currentTarget).focus();
-  }
-
-  /*
-  onrowevent(event)
-  {
-    this["onrow" + event.type](event);
-  }
-
-  onrowmousedown(event)
-  {
-    const tr = event.currentTarget;
-    if (
-      !utils.event.isLeftClick(event) ||
-      tr.classList.contains("empty")
-    )
-      return;
-    const td = event.target.closest("td");
-    if (!td)
-      return;
-    const {info} = td.dataset;
-    if (info === "status" || info === "selected")
-      return;
-    const div = $('td[data-info="rule"] > .content', td.parentNode);
-    const {textContent} = div;
-    const {filters} = this;
-    const filter = filters.find(item => item.text === textContent);
-    if (info === "remove")
-    {
-      dispatch.call(this, info, filter);
-      filters.splice(filters.indexOf(filter), 1);
-      updateScrollbar.call(this);
-    }
-    else if (info === "status")
-    {
-      dispatch.call(this, filter.enabled ? "disable" : "enable", filter);
-      filter.enabled = !filter.enabled;
-      this.render();
-    }
-    else if (info === "rule" && tr.classList.contains("selected"))
-    {
-      this.selected = [filter];
-      this.render();
-      div.contentEditable = true;
-      div.focus();
-    }
-    else if (!tr.classList.contains("selected"))
-    {
-      if (event.shiftKey && this.selected.length)
+      if (start < end)
       {
-        const first = this.selected[0];
-        let start = filters.indexOf(first);
-        const end = filters.indexOf(filter);
-        this.selected = [first];
-        if (start < end)
-        {
-          while (start++ < end)
-            this.selected.push(filters[start]);
-        }
-        else
-        {
-          while (start-- > end)
-            this.selected.push(filters[start]);
-        }
+        while (start++ < end)
+          this.selected[method](filters[start]);
       }
       else
       {
-        // drop all entries and put the current filter in
-        this.selected = [filter];
+        while (start-- > end)
+          this.selected[method](filters[start]);
       }
-      this.render();
     }
+    else
+    {
+      this._lastFilter = filter;
+      if (this.selected.has(filter))
+        this.selected.delete(filter);
+      else
+        this.selected.add(filter);
+    }
+    // render updated right after the checkbox changes
   }
-  */
+
+  // used in both selected and status
+  // the selected needs it to render at the right time
+  // which is when the checkbox status changed
+  // not when it's clicked
+  onchange(event)
+  {
+    const td = event.currentTarget.closest("td");
+    if (td.dataset.column === "status")
+    {
+      const filter = getFilter(event);
+      filter.disabled = !filter.disabled;
+      browser.runtime.sendMessage({
+        type: "filters.toggle",
+        text: filter.text,
+        disabled: filter.disabled
+      });
+    }
+    this.render();
+  }
 
   postRender(list)
   {
@@ -609,7 +733,7 @@ class IOFilterList extends IOElement
     {
       this.setState({
         tbody: tbody || $("tbody", this),
-        filters: list.concat(Object.create(list[0] || {}))
+        filters: list.concat({})
       });
     }
   }
@@ -623,8 +747,7 @@ class IOFilterList extends IOElement
       const {rowHeight, scrollTop, viewHeight} = this.state;
       const length = this.state.filters.length;
       let count = 0;
-      let i = Math.max(0, Math.floor(scrollTop / rowHeight));
-      this._stripes = i % 2;
+      let i = Math.floor(scrollTop / rowHeight);
       // always add an extra row to make scrolling smooth
       while ((count * rowHeight) < (viewHeight + rowHeight))
       {
@@ -633,17 +756,35 @@ class IOFilterList extends IOElement
     }
     this.html`<table cellpadding="0" cellspacing="0">
       <thead onclick="${this}" data-call="onheaderclick">
-        <th data-info="selected"><input type="checkbox"></th>
-        <th data-info="status">
-          ${{i18n: "options_filterList_column_status"}}
-        </th>
-        <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
-        <th data-info="warning">⚠</th>
+        <th data-column="selected"><io-checkbox /></th>
+        <th data-column="status"></th>
+        <th data-column="rule">${{i18n: "options_filter_list_rule"}}</th>
+        <th data-column="warning">${
+          // for the header, just return always the same warning icon
+          warnings.get(this) || createImageFor(warnings, this)
+        }</th>
       </thead>
       <tbody>${list.map(getRow, this)}</tbody>
-    </table>
-    ${this.scrollbar}`;
+      ${this.scrollbar}
+    </table>`;
     this.postRender(list);
+  }
+
+  sortBy(type, isAscending)
+  {
+    const th = $(`th[data-column="${type}"]`, this);
+    if (!th)
+    {
+      console.error(`unable to sort by ${type}`);
+      return;
+    }
+    const {sort} = this.state;
+    sort.current = type;
+    // sort.asc is flipped with current state
+    // so set the one that is not desired
+    sort.asc = !isAscending;
+    // before triggering the event
+    th.click();
   }
 
   updateScrollbar()
@@ -661,129 +802,206 @@ IOFilterList.define("io-filter-list");
 
 module.exports = IOFilterList;
 
+// delegates the handling of errors
+function dispatchError(reason, filter)
+{
+  this.dispatchEvent(new CustomEvent("error", {
+    cancelable: false,
+    bubbles: true,
+    detail: {
+      reason,
+      filter
+    }
+  }));
+}
+
 // Please note: the contenteditable=${...} attribute
 // cannot be set directly to the TD because of an ugly
-// MS Edge b ug that does not allow TDs to be editable.
+// MS Edge bug that does not allow TDs to be editable.
 function getRow(filter, i)
 {
-  let className = ((this._stripes + i) % 2) ? "odd" : "even";
   if (filter)
   {
     const selected = this.selected.has(filter);
-    if (selected)
-      className += " selected";
     return wire(filter)`
-    <tr class="${className}">
-      <td data-info="selected">
-        <input type="checkbox" checked="${selected}"
-                onclick="${this}" data-call="onchange">
+    <tr class="${selected ? "selected" : ""}">
+      <td data-column="selected">
+        <io-checkbox
+          checked="${selected}"
+          onclick="${this}" onchange="${this}"
+        />
       </td>
-      <td data-info="status">
-        <io-toggle checked="${filter.enabled}" onchange="${this}" />
-        ${filter.enabled ? "Active" : "Disabled"}
+      <td data-column="status">
+        <io-toggle checked="${!filter.disabled}" onchange="${this}" />
       </td>
-      <td data-info="rule" onmousedown="${this}">
+      <td data-column="rule">
         <div
           class="content"
           contenteditable="${!this.disabled}"
           title="${filter.text}"
           onkeydown="${this}"
           onkeyup="${this}"
+          onfocus="${this}"
           onblur="${this}"
+          data="${filter}"
         >${filter.text}</div>
       </td>
-      <td data-info="warning">
+      <td data-column="warning">
         ${getWarning(filter)}
       </td>
     </tr>`;
   }
   // no filter results into an empty, not editable, row
   return wire(this, `:${i}`)`
-    <tr
-      class="${className + " empty"}"
-    >
-      <td data-info="selected"></td>
-      <td data-info="status"></td>
-      <td data-info="rule"></td>
-      <td data-info="warning"></td>
+    <tr class="empty">
+      <td data-column="selected"></td>
+      <td data-column="status"></td>
+      <td data-column="rule"></td>
+      <td data-column="warning"></td>
     </tr>`;
 }
 
-const snails = new WeakMap();
-const createSnail = (filter) =>
+// used to show issues in the last column
+const issues = new WeakMap();
+
+// used to show warnings in the last column
+const warnings = new WeakMap();
+
+// relate either issues or warnings to a filter
+const createImageFor = (weakMap, filter) =>
 {
-  /*
-  const snail = wire()`
-    <img src="skin/icons/snail.svg" title="${filter.slow}">`;
-  */
-  const snail = document.createTextNode("⚠");
-  snails.set(filter, snail);
-  return snail;
+  const isIssue = weakMap === issues;
+  const image = new Image();
+  image.src = `skin/icons/${isIssue ? "error" : "alert"}.svg`;
+  if (isIssue)
+    image.title = filter.reason;
+  weakMap.set(filter, image);
+  return image;
 };
-function getWarning(filter)
+
+function focusTheNextFilterIfAny(tr)
 {
-  switch (filter.slow)
+  const i = this.filters.indexOf(this._filter) + 1;
+  if (i < this.filters.length)
   {
-    case "🐌":
-    case "!":
-      return snails.get(filter) || createSnail(filter);
-    default:
-      return "";
+    const next = tr.nextElementSibling;
+    const {rowHeight, scrollTop, viewHeight} = this.state;
+    // used to avoid race conditions with blur event
+    this._changingFocus = true;
+    // force eventually the scrollTop to make
+    // the next row visible
+    if (next.offsetTop > viewHeight)
+    {
+      this.setState({
+        scrollTop: getScrollTop(scrollTop + rowHeight)
+      });
+    }
+    // focus its content field
+    $(".content", next).focus();
+    // set back the _changingFocus
+    this._changingFocus = false;
   }
 }
 
-function dispatch(info, detail)
+function dropSavedClass(event)
 {
-  const event = new CustomEvent(`filter:${info}`, {
-    detail,
-    bubbles: true,
-    cancelable: true
-  });
-  this.dispatchEvent(event);
-  return event;
+  const {currentTarget} = event;
+  currentTarget.classList.remove("saved");
+  currentTarget.removeEventListener(event.type, dropSavedClass);
 }
 
-/*
-  to have a scrollable body, thead and tbody are set
-  as display: block, detaching their auto table alignment
-  so that this helper would set each header TH size accordingly
- */
-function setupTable()
+function getFilter(event)
 {
-  const table = $("table", this);
-  const THs = $$("thead th", this);
-  const TDs = $$("tbody tr:first-child td", table);
-  const size = [];
-  THs.forEach((th, i) =>
+  const el = event.currentTarget;
+  const div = $('td[data-column="rule"] > .content', el.closest("tr"));
+  return div.data;
+}
+
+// ensure the number is always between 0 and a positive number
+// specially handy when filters are erased and the viewHeight
+// is higher than scrollHeight and other cases too
+function getScrollTop(value, scrollHeight)
+{
+  return Math.max(
+    0,
+    Math.min(scrollHeight || Infinity, value)
+  );
+}
+
+function getWarning(filter)
+{
+  if (filter.reason)
+    return issues.get(filter) || createImageFor(issues, filter);
+  if (filter.slow)
+    return warnings.get(filter) || createImageFor(warnings, filter);
+  return "";
+}
+
+function replaceFilter(filter, currentTarget)
+{
+  const {text} = filter;
+  browser.runtime.sendMessage({
+    type: "filters.replace",
+    old: prevFilterText.get(filter),
+    new: text
+  }).then(errors =>
   {
-    table.style.setProperty(`--width-${th.dataset.info}`, "auto");
-    size[i] = Math.max(th.clientWidth, TDs[i].clientWidth);
-  });
-  THs.forEach((th, i) =>
-  {
-    if (th.dataset.info === "rule")
+    if (errors.length)
     {
-      size[i] = table.clientWidth -
-                size.reduce((total, current) => total + current, -size[i]);
+      filter.reason = errors[0];
+      this.render();
+      return;
     }
-    table.style.setProperty(`--width-${th.dataset.info}`, `${size[i]}px`);
+    prevFilterText.set(filter, text);
+    delete filter.reason;
+    currentTarget.addEventListener("animationend", dropSavedClass);
+    currentTarget.classList.add("saved");
   });
-  table.classList.add("visible");
 }
 
-/*
-function updateScrollbar()
+function setScrollbarReactiveOpacity()
 {
-  const {rowHeight, viewHeight} = this.state;
-  const {length} = this.filters;
-  this.scrollbar.size = rowHeight * length;
-  this.setState({
-    scrollHeight: rowHeight * (length + 1) - viewHeight
+  // get native value for undefined opacity
+  const opacity = this.scrollbar.style.opacity;
+  // cache it once to never duplicate listeners
+  const cancelOpacity = () =>
+  {
+    // store default opacity value back
+    this.scrollbar.style.opacity = opacity;
+    // drop all listeners
+    document.removeEventListener("pointerup", cancelOpacity);
+    document.removeEventListener("pointercancel", cancelOpacity);
+  };
+  // add listeners on scrollbaro pointerdown event
+  this.scrollbar.addEventListener("pointerdown", () =>
+  {
+    this.scrollbar.style.opacity = 1;
+    document.addEventListener("pointerup", cancelOpacity);
+    document.addEventListener("pointercancel", cancelOpacity);
   });
 }
-*/
 
-},{"./dom":1,"./io-element":2,"./io-scrollbar":6,"./io-toggle":7}],4:[function(require,module,exports){
+// listen to filters messages and eventually
+// delegate the error handling
+function setupPort()
+{
+  port.onMessage.addListener((message) =>
+  {
+    if (message.type === "filters.respond" && message.action === "disabled")
+    {
+      const [beFilter, value] = message.args;
+      const filter = this.filters.find(f => f.text === beFilter.text);
+      if (value !== filter.disabled)
+      {
+        dispatchError.call(this, "filter.disabled", filter);
+        filter.disabled = value;
+        this.render();
+      }
+    }
+  });
+}
+
+},{"./dom":1,"./io-checkbox":2,"./io-element":3,"./io-scrollbar":7,"./io-toggle":8}],5:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -811,20 +1029,42 @@ const {$} = require("./dom");
 // and filter:match({accuracy, filter}) events
 class IOFilterSearch extends IOElement
 {
-  static get booleanAttributes() { return ["disabled"]; }
+  static get booleanAttributes()
+  {
+    return ["disabled"];
+  }
 
-  static get observedAttributes() { return ["match"]; }
+  static get observedAttributes()
+  {
+    return ["match"];
+  }
 
-  get defaultState() { return {filterExists: true, filters: [], match: -1}; }
+  get defaultState()
+  {
+    return {
+      filterExists: true,
+      filters: [],
+      match: -1
+    };
+  }
 
-  get filters() { return this.state.filters; }
+  get filters()
+  {
+    return this.state.filters;
+  }
 
   // filters are never modified or copied
   // but used to find out if one could be added
   // or if the component in charge should show the found one
-  set filters(value) { this.setState({filters: value || []}); }
+  set filters(value)
+  {
+    this.setState({filters: value || []});
+  }
 
-  get match() { return this.state.match; }
+  get match()
+  {
+    return this.state.match;
+  }
 
   // match is a number between -1 and 1
   // -1 means any match
@@ -837,7 +1077,10 @@ class IOFilterSearch extends IOElement
     }, false);
   }
 
-  get value() { return $("input", this).value.trim(); }
+  get value()
+  {
+    return $("input", this).value.trim();
+  }
 
   set value(text)
   {
@@ -884,7 +1127,6 @@ class IOFilterSearch extends IOElement
     {
       case "Enter":
         const {value} = this;
-        $("input", this).blur();
         if (
           value.length &&
           !this.disabled &&
@@ -915,6 +1157,8 @@ class IOFilterSearch extends IOElement
       const result = search.call(this, value);
       if (result.accuracy && match <= result.accuracy)
         dispatch.call(this, "filter:match", result);
+      else if (!value.length)
+        this.disabled = true;
     }, 100);
   }
 
@@ -1013,7 +1257,7 @@ function search(value)
   return {accuracy, filter: closerFilter};
 }
 
-},{"./dom":1,"./io-element":2}],5:[function(require,module,exports){
+},{"./dom":1,"./io-element":3}],6:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -1037,11 +1281,9 @@ const IOElement = require("./io-element");
 const IOFilterList = require("./io-filter-list");
 const IOFilterSearch = require("./io-filter-search");
 
-const {clipboard} = require("./dom");
+const {$, clipboard} = require("./dom");
 
 const {bind, wire} = IOElement;
-
-const log = window.console.log;
 
 // io-filter-table is a basic controller
 // used to relate the search and the list
@@ -1107,8 +1349,10 @@ class IOFilterTable extends IOElement
           this.list.selected.delete(filter);
           this.filters.splice(this.filters.indexOf(filter), 1);
         }
-        this.list.render();
-        this.list.updateScrollbar();
+        updateList(this.list);
+        // after deleting all there's no reason
+        // to keep the column selected
+        $('th[data-column="selected"] io-checkbox', this).checked = false;
         break;
       case "copy":
         const filters = [];
@@ -1137,6 +1381,7 @@ class IOFilterTable extends IOElement
         this.filters.splice(this.filters.indexOf(filter), 1);
       this.filters.unshift(filter);
     }
+    updateList(this.list);
     this.list.scrollTo(this.filters[0]);
     setTimeout(() => this.search.value = "");
   }
@@ -1166,8 +1411,8 @@ class IOFilterTable extends IOElement
   {
     bind(this.footer)`
       <div class="footer">
-        <button class="delete" onclick="${this}">🗑 DELETE</button>
-        <button class="copy" onclick="${this}">📃 COPY SELECTED</button>
+        <button class="delete" onclick="${this}">DELETE</button>
+        <button class="copy" onclick="${this}">COPY SELECTED</button>
       </div>
     `;
   }
@@ -1175,7 +1420,13 @@ class IOFilterTable extends IOElement
 
 IOFilterTable.define("io-filter-table");
 
-},{"./dom":1,"./io-element":2,"./io-filter-list":3,"./io-filter-search":4}],6:[function(require,module,exports){
+function updateList(list)
+{
+  list.render();
+  list.updateScrollbar();
+}
+
+},{"./dom":1,"./io-element":3,"./io-filter-list":4,"./io-filter-search":5}],7:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -1283,16 +1534,8 @@ class IOScrollbar extends IOElement
 
   set position(value)
   {
-    // if created procedurally
-    // the basic DOM info might not be there yet
     if (!this._elSize)
-    {
-      // in that case re-calculate the size
-      sizeChange.call(this);
-      // and if it's still unknown get out
-      if (!this._elSize)
-        return;
-    }
+      return;
     setPosition.call(this, value);
   }
 
@@ -1427,7 +1670,7 @@ function stop(event)
   event.stopPropagation();
 }
 
-},{"./dom":1,"./io-element":2}],7:[function(require,module,exports){
+},{"./dom":1,"./io-element":3}],8:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -1519,7 +1762,7 @@ IOToggle.define("io-toggle");
 
 module.exports = IOToggle;
 
-},{"./io-element":2}],8:[function(require,module,exports){
+},{"./io-element":3}],9:[function(require,module,exports){
 /*!
 ISC License
 
@@ -3027,16 +3270,16 @@ function installCustomElements(window, polyfill) {'use strict';
 
 module.exports = installCustomElements;
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 'use strict';
 /*! (C) 2017-2018 Andrea Giammarchi - ISC Style License */
 
 const {Component, bind, define, hyper, wire} = require('hyperhtml/cjs');
 
 // utils to deal with custom elements builtin extends
+const ATTRIBUTE_CHANGED_CALLBACK = 'attributeChangedCallback';
 const O = Object;
 const classes = [];
-const defineProperties = O.defineProperties;
 const defineProperty = O.defineProperty;
 const getOwnPropertyDescriptor = O.getOwnPropertyDescriptor;
 const getOwnPropertyNames = O.getOwnPropertyNames;
@@ -3046,6 +3289,7 @@ const ownKeys = typeof Reflect === 'object' && Reflect.ownKeys ||
                 (o => getOwnPropertyNames(o).concat(getOwnPropertySymbols(o)));
 const setPrototypeOf = O.setPrototypeOf ||
                       ((o, p) => (o.__proto__ = p, o));
+const camel = name => name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase());
 
 class HyperHTMLElement extends HTMLElement {
 
@@ -3056,106 +3300,138 @@ class HyperHTMLElement extends HTMLElement {
     const Class = this;
     const proto = Class.prototype;
 
-    // if observedAttributes contains attributes to observe
+    const onChanged = proto[ATTRIBUTE_CHANGED_CALLBACK];
+    const hasChange = !!onChanged;
+
+    // Class.booleanAttributes
+    // -----------------------------------------------
+    // attributes defined as boolean will have
+    // an either available or not available attribute
+    // regardless of the value.
+    // All falsy values, or "false", mean attribute removed
+    // while truthy values will be set as is.
+    // Boolean attributes are also automatically observed.
+    const booleanAttributes = Class.booleanAttributes || [];
+    booleanAttributes.forEach(name => {
+      if (!(name in proto))
+        defineProperty(
+        proto,
+        camel(name),
+        {
+          configurable: true,
+          get() {
+            return this.hasAttribute(name);
+          },
+          set(value) {
+            if (!value || value === 'false')
+              this.removeAttribute(name);
+            else
+              this.setAttribute(name, value);
+          }
+        }
+      );
+    });
+
+    // Class.observedAttributes
+    // -------------------------------------------------------
     // HyperHTMLElement will directly reflect get/setAttribute
     // operation once these attributes are used, example:
     // el.observed = 123;
     // will automatically do
     // el.setAttribute('observed', 123);
     // triggering also the attributeChangedCallback
-    (Class.observedAttributes || []).forEach(name => {
-      if (!(name in proto)) defineProperty(
+    const observedAttributes = Class.observedAttributes || [];
+    observedAttributes.forEach(name => {
+      // it is possible to redefine the behavior at any time
+      // simply overwriting get prop() and set prop(value)
+      if (!(name in proto))
+        defineProperty(
         proto,
-        name.replace(/-([a-z])/g, ($0, $1) => $1.toUpperCase()),
+        camel(name),
         {
           configurable: true,
-          get() { return this.getAttribute(name); },
-          set(value) { this.setAttribute(name, value); }
+          get() {
+            return this.getAttribute(name);
+          },
+          set(value) {
+            if (value == null)
+              this.removeAttribute(name);
+            else
+              this.setAttribute(name, value);
+          }
         }
       );
     });
 
-    const onChanged = proto.attributeChangedCallback;
-    const hasChange = !!onChanged;
+    // if these are defined, overwrite the observedAttributes getter
+    // to include also booleanAttributes
+    const attributes = booleanAttributes.concat(observedAttributes);
+    if (attributes.length)
+      defineProperty(Class, 'observedAttributes', {
+        get() { return attributes; }
+      });
 
-    // created() {} is an initializer method that grants
+    // created() {}
+    // ---------------------------------
+    // an initializer method that grants
     // the node is fully known to the browser.
     // It is ensured to run either after DOMContentLoaded,
     // or once there is a next sibling (stream-friendly) so that
     // you have full access to element attributes and/or childNodes.
-    const created = proto.created;
-    if (created) {
-      // used to ensure create() is called once and once only
-      defineProperty(
-        proto,
-        '_init$',
-        {
-          configurable: true,
-          writable: true,
-          value: true
-        }
-      );
+    const created = proto.created || function () {
+      this.render();
+    };
 
-      // ⚠️ if you need to overwrite/change attributeChangedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      defineProperty(
-        proto,
-        'attributeChangedCallback',
-        {
-          configurable: true,
-          value(name, prev, curr) {
-            if (this._init$) {
-              checkReady.call(this, created);
-            }
-            // ensure setting same value twice
-            // won't trigger twice attributeChangedCallback
-            if (hasChange && prev !== curr) {
-              onChanged.apply(this, arguments);
-            }
-          }
-        }
-      );
+    // used to ensure create() is called once and once only
+    defineProperty(
+      proto,
+      '_init$',
+      {
+        configurable: true,
+        writable: true,
+        value: true
+      }
+    );
 
-      // ⚠️ if you need to overwrite/change connectedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      const onConnected = proto.connectedCallback;
-      const hasConnect = !!onConnected;
-      defineProperty(
-        proto,
-        'connectedCallback',
-        {
-          configurable: true,
-          value() {
-            if (this._init$) {
-              checkReady.call(this, created);
-            }
-            if (hasConnect) {
-              onConnected.apply(this, arguments);
-            }
+    defineProperty(
+      proto,
+      ATTRIBUTE_CHANGED_CALLBACK,
+      {
+        configurable: true,
+        value: function aCC(name, prev, curr) {
+          if (this._init$) {
+            checkReady.call(this, created);
+            if (this._init$)
+              return this._init$$.push(aCC.bind(this, name, prev, curr));
+          }
+          // ensure setting same value twice
+          // won't trigger twice attributeChangedCallback
+          if (hasChange && prev !== curr) {
+            onChanged.apply(this, arguments);
           }
         }
-      );
-    } else if (hasChange) {
-      // ⚠️ if you need to overwrite/change attributeChangedCallback method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
-      defineProperty(
-        proto,
-        'attributeChangedCallback',
-        {
-          configurable: true,
-          value(name, prev, curr) {
-            // ensure setting same value twice
-            // won't trigger twice attributeChangedCallback
-            if (prev !== curr) {
-              onChanged.apply(this, arguments);
-            }
+      }
+    );
+
+    const onConnected = proto.connectedCallback;
+    const hasConnect = !!onConnected;
+    defineProperty(
+      proto,
+      'connectedCallback',
+      {
+        configurable: true,
+        value: function cC() {
+          if (this._init$) {
+            checkReady.call(this, created);
+            if (this._init$)
+              return this._init$$.push(cC.bind(this));
+          }
+          if (hasConnect) {
+            onConnected.apply(this, arguments);
           }
         }
-      );
-    }
+      }
+    );
 
     // define lazily all handlers
     // class { handleClick() { ... }
@@ -3182,9 +3458,6 @@ class HyperHTMLElement extends HTMLElement {
     //    render() { this.html`<input oninput="${this}">`; }
     //  }
     if (!('handleEvent' in proto)) {
-      // ⚠️ if you need to overwrite/change handleEvent method
-      //    at runtime after class definition, be sure you do so
-      //    via Object.defineProperty to preserve its non-enumerable nature.
       defineProperty(
         proto,
         'handleEvent',
@@ -3254,12 +3527,12 @@ class HyperHTMLElement extends HTMLElement {
     defineProperty(this, '_html$', {configurable: true, value: value});
   }
 
+  // overwrite this method with your own render
+  render() {}
+
   // ---------------------//
   // Basic State Handling //
   // ---------------------//
-
-  // overwrite this method with your own render
-  render() {}
 
   // define the default state object
   // you could use observed properties too
@@ -3282,7 +3555,8 @@ class HyperHTMLElement extends HTMLElement {
     const target = this.state;
     const source = typeof state === 'function' ? state.call(this, target) : state;
     for (const key in source) target[key] = source[key];
-    if (render !== false) this.render();
+    if (render !== false)
+      this.render();
     return this;
   }
 
@@ -3296,7 +3570,8 @@ HyperHTMLElement.wire = wire;
 HyperHTMLElement.hyper = hyper;
 
 try {
-  if (Symbol.hasInstance) classes.push(
+  if (Symbol.hasInstance)
+    classes.push(
     defineProperty(HyperHTMLElement, Symbol.hasInstance, {
       enumerable: false,
       configurable: true,
@@ -3312,30 +3587,49 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = HyperHTMLE
 // DOMContentLoaded VS created() //
 // ------------------------------//
 const dom = {
-  handleEvent: function (e) {
-    if (dom.ready) {
-      document.removeEventListener(e.type, dom, false);
-      dom.list.splice(0).forEach(function (fn) { fn(); });
+  type: 'DOMContentLoaded',
+  handleEvent() {
+    if (dom.ready()) {
+      document.removeEventListener(dom.type, dom, false);
+      dom.list.splice(0).forEach(invoke);
     }
+    else
+      setTimeout(dom.handleEvent);
   },
-  get ready() {
+  ready() {
     return document.readyState === 'complete';
   },
   list: []
 };
 
-if (!dom.ready) {
-  document.addEventListener('DOMContentLoaded', dom, false);
+if (!dom.ready()) {
+  document.addEventListener(dom.type, dom, false);
 }
 
+
+const dafuq = new WeakSet;
 function checkReady(created) {
-  if (dom.ready || isReady.call(this, created)) {
+  if (dom.ready() || isReady.call(this, created)) {
     if (this._init$) {
+      if (dafuq.has(this))
+        throw new Error('WTF');
+      dafuq.add(this);
+      const list = this._init$$;
+      if (list)
+        delete this._init$$;
       created.call(defineProperty(this, '_init$', {value: false}));
+      if (list)
+        list.forEach(invoke);
     }
   } else {
+    if (!this.hasOwnProperty('_init$$'))
+      defineProperty(this, '_init$$', {configurable: true, value: []});
     dom.list.push(checkReady.bind(this, created));
   }
+}
+
+function invoke(fn) {
+  fn();
 }
 
 function isPrototypeOf(Class) {
@@ -3350,7 +3644,7 @@ function isReady(created) {
   return false;
 }
 
-},{"hyperhtml/cjs":16}],10:[function(require,module,exports){
+},{"hyperhtml/cjs":17}],11:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 /*! (c) 2018 Andrea Giammarchi (ISC) */
@@ -3575,7 +3869,7 @@ const domdiff = (
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = domdiff;
 
-},{"./utils.js":11}],11:[function(require,module,exports){
+},{"./utils.js":12}],12:[function(require,module,exports){
 'use strict';
 /* AUTOMATICALLY IMPORTED, DO NOT MODIFY */
 const append = (get, parent, children, start, end, before) => {
@@ -3973,7 +4267,7 @@ const smartDiff = (
 };
 exports.smartDiff = smartDiff;
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 const { Map, WeakMap } = require('../shared/poorlyfills.js');
 
@@ -4130,7 +4424,7 @@ const setValue = (self, secret, value) =>
   })[secret]
 ;
 
-},{"../shared/poorlyfills.js":24}],13:[function(require,module,exports){
+},{"../shared/poorlyfills.js":25}],14:[function(require,module,exports){
 'use strict';
 const { append } = require('../shared/utils.js');
 const { doc, fragment } = require('../shared/easy-dom.js');
@@ -4165,7 +4459,7 @@ Wire.prototype.remove = function remove() {
   return first;
 };
 
-},{"../shared/easy-dom.js":22,"../shared/utils.js":26}],14:[function(require,module,exports){
+},{"../shared/easy-dom.js":23,"../shared/utils.js":27}],15:[function(require,module,exports){
 'use strict';
 const {Map, WeakMap} = require('../shared/poorlyfills.js');
 const {G, UIDC, VOID_ELEMENTS} = require('../shared/constants.js');
@@ -4247,7 +4541,7 @@ const SC_PLACE = ($0, $1, $2) => {
 
 Object.defineProperty(exports, '__esModule', {value: true}).default = render;
 
-},{"../objects/Updates.js":20,"../shared/constants.js":21,"../shared/poorlyfills.js":24,"../shared/re.js":25,"../shared/utils.js":26}],15:[function(require,module,exports){
+},{"../objects/Updates.js":21,"../shared/constants.js":22,"../shared/poorlyfills.js":25,"../shared/re.js":26,"../shared/utils.js":27}],16:[function(require,module,exports){
 'use strict';
 const {ELEMENT_NODE, SVG_NAMESPACE} = require('../shared/constants.js');
 const {WeakMap, trim} = require('../shared/poorlyfills.js');
@@ -4347,7 +4641,7 @@ exports.content = content;
 exports.weakly = weakly;
 Object.defineProperty(exports, '__esModule', {value: true}).default = wire;
 
-},{"../classes/Wire.js":13,"../shared/constants.js":21,"../shared/easy-dom.js":22,"../shared/poorlyfills.js":24,"../shared/utils.js":26,"./render.js":14}],16:[function(require,module,exports){
+},{"../classes/Wire.js":14,"../shared/constants.js":22,"../shared/easy-dom.js":23,"../shared/poorlyfills.js":25,"../shared/utils.js":27,"./render.js":15}],17:[function(require,module,exports){
 'use strict';
 /*! (c) Andrea Giammarchi (ISC) */
 
@@ -4409,7 +4703,7 @@ function hyper(HTML) {
 }
 Object.defineProperty(exports, '__esModule', {value: true}).default = hyper
 
-},{"./3rd/domdiff.js":10,"./classes/Component.js":12,"./hyper/render.js":14,"./hyper/wire.js":15,"./objects/Intent.js":17}],17:[function(require,module,exports){
+},{"./3rd/domdiff.js":11,"./classes/Component.js":13,"./hyper/render.js":15,"./hyper/wire.js":16,"./objects/Intent.js":18}],18:[function(require,module,exports){
 'use strict';
 const attributes = {};
 const intents = {};
@@ -4451,7 +4745,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 };
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 const {
   COMMENT_NODE,
@@ -4511,7 +4805,7 @@ Object.defineProperty(exports, '__esModule', {value: true}).default = {
   }
 }
 
-},{"../shared/constants.js":21}],19:[function(require,module,exports){
+},{"../shared/constants.js":22}],20:[function(require,module,exports){
 'use strict';
 // from https://github.com/developit/preact/blob/33fc697ac11762a1cb6e71e9847670d047af7ce5/src/constants.js
 const IS_NON_DIMENSIONAL = /acit|ex(?:s|g|n|p|$)|rph|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
@@ -4594,7 +4888,7 @@ const toStyle = object => {
   }
   return css.join('');
 };
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 const {
   CONNECTED, DISCONNECTED, COMMENT_NODE, DOCUMENT_FRAGMENT_NODE, ELEMENT_NODE, TEXT_NODE, OWNER_SVG_ELEMENT, SHOULD_USE_TEXT_CONTENT, UID, UIDC
@@ -5118,7 +5412,7 @@ function observe() {
   }
 }
 
-},{"../3rd/domdiff.js":10,"../classes/Component.js":12,"../classes/Wire.js":13,"../shared/constants.js":21,"../shared/easy-dom.js":22,"../shared/poorlyfills.js":24,"../shared/utils.js":26,"./Intent.js":17,"./Path.js":18,"./Style.js":19}],21:[function(require,module,exports){
+},{"../3rd/domdiff.js":11,"../classes/Component.js":13,"../classes/Wire.js":14,"../shared/constants.js":22,"../shared/easy-dom.js":23,"../shared/poorlyfills.js":25,"../shared/utils.js":27,"./Intent.js":18,"./Path.js":19,"./Style.js":20}],22:[function(require,module,exports){
 'use strict';
 const G = document.defaultView;
 exports.G = G;
@@ -5163,7 +5457,7 @@ exports.UID = UID;
 const UIDC = '<!--' + UID + '-->';
 exports.UIDC = UIDC;
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 'use strict';
 // these are tiny helpers to simplify most common operations needed here
 const create = (node, type) => doc(node).createElement(type);
@@ -5175,7 +5469,7 @@ exports.fragment = fragment;
 const text = (node, text) => doc(node).createTextNode(text);
 exports.text = text;
 
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 'use strict';
 const {create, fragment, text} = require('./easy-dom.js');
 
@@ -5202,7 +5496,7 @@ exports.hasDoomedCloneNode = hasDoomedCloneNode;
 const hasImportNode = 'importNode' in document;
 exports.hasImportNode = hasImportNode;
 
-},{"./easy-dom.js":22}],24:[function(require,module,exports){
+},{"./easy-dom.js":23}],25:[function(require,module,exports){
 'use strict';
 const {G, UID} = require('./constants.js');
 
@@ -5276,7 +5570,7 @@ const trim = UID.trim || function () {
 };
 exports.trim = trim;
 
-},{"./constants.js":21}],25:[function(require,module,exports){
+},{"./constants.js":22}],26:[function(require,module,exports){
 'use strict';
 // TODO:  I'd love to code-cover RegExp too here
 //        these are fundamental for this library
@@ -5301,7 +5595,7 @@ exports.attrName = attrName;
 exports.attrSeeker = attrSeeker;
 exports.selfClosing = selfClosing;
 
-},{}],26:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 'use strict';
 const {attrName, attrSeeker} = require('./re.js');
 
@@ -5510,26 +5804,40 @@ const SVGFragment = hasContent ?
     return content;
   };
 
-},{"./constants.js":21,"./easy-dom.js":22,"./features-detection.js":23,"./poorlyfills.js":24,"./re.js":25}],27:[function(require,module,exports){
+},{"./constants.js":22,"./easy-dom.js":23,"./features-detection.js":24,"./poorlyfills.js":25,"./re.js":26}],28:[function(require,module,exports){
 "use strict";
 
 require("../js/io-filter-table");
 
-fetch("../tests/easylist.txt")
-      .then(b => b.text())
-      .then(text =>
-      {
-        const filters = text.replace(/^[![].*/gm, "").split("\n")
-                            .filter(line => line.trim().length)
-                            .map(line => ({
-                              enabled: Math.random() < 0.5,
-                              text: line,
-                              hits: (Math.random() * 9) >>> 0,
-                              slow: Math.random() < 0.2 ? "🐌" :
-                                    (Math.random() < 0.3 ? "!" : "")
-                            }));
+const length = (Math.random() * 50) >>> 0;
+const ioFilterTable = document.querySelector("io-filter-table");
+ioFilterTable.filters = require("./random-filter-list")(length);
 
-        document.querySelector("io-filter-table").filters = filters.slice(0, 32);
-      });
+},{"../js/io-filter-table":6,"./random-filter-list":29}],29:[function(require,module,exports){
+"use strict";
 
-},{"../js/io-filter-table":5}]},{},[27]);
+module.exports = (amount = 50) =>
+{
+  const list = new Array(amount);
+  while (amount-- > 0)
+  {
+    const text = randomString();
+    list[amount] = {
+      disabled: Math.random() < 0.5,
+      slow: text.indexOf("/") > -1,
+      text
+    };
+  }
+  return list;
+};
+
+function randomString()
+{
+  let length = 5 + Math.round(Math.random() * 45);
+  const output = new Array(length);
+  while (length-- > 0)
+    output[length] = String.fromCharCode(48 + Math.round(Math.random() * 74));
+  return output.join("");
+}
+
+},{}]},{},[28]);

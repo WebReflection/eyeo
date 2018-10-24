@@ -31,6 +31,22 @@
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
 io-filter-search {
   display: flex;
   flex-direction: row;
@@ -69,161 +85,6 @@ io-filter-search > button:disabled {
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
-io-filter-list {
-  position: relative;
-  min-width: 500px;
-  padding: 0; }
-
-io-filter-list,
-io-filter-list *,
-io-filter-list *::before,
-io-filter-list *::after {
-  box-sizing: border-box; }
-
-io-filter-list table {
-  /* set as visible once populated */
-  visibility: hidden;
-  width: 100%;
-  color: #505050;
-  background-color: #fff; }
-
-io-filter-list table {
-  border: 1px solid #bcbcbc;
-  user-select: none; }
-
-io-filter-list thead {
-  user-select: none; }
-
-io-filter-list thead tr,
-io-filter-list td {
-  border-bottom: 1px solid #bcbcbc; }
-
-io-filter-list tr.empty td,
-io-filter-list tr:last-child td {
-  border-bottom: 0; }
-
-io-filter-list table.visible {
-  visibility: visible; }
-
-/* necessary to have scrollable tbody */
-io-filter-list thead tr,
-io-filter-list tbody {
-  display: block; }
-
-io-filter-list tbody {
-  overflow: hidden;
-  height: 300px; }
-
-io-filter-list th,
-io-filter-list td {
-  min-width: 24px;
-  padding: 4px 8px;
-  text-align: center; }
-
-io-filter-list th {
-  padding: 8px; }
-
-io-filter-list tbody tr {
-  height: var(--row-height, auto);
-  outline: none; }
-
-/*
-io-filter-list tbody tr.odd
-{
-  background-color: #f1f1f1;
-}
-*/
-io-filter-list tbody tr.odd.selected,
-io-filter-list tbody tr.selected {
-  background-color: #f6f6f6; }
-
-io-filter-list [data-info="status"] {
-  width: 160px;
-  white-space: nowrap; }
-
-html:not([dir="rtl"]) io-filter-list [data-info="status"] {
-  padding-right: 24px; }
-
-html[dir="rtl"] io-filter-list [data-info="status"] {
-  padding-left: 24px; }
-
-io-filter-list [data-info="rule"] {
-  width: var(--width-rule, auto);
-  max-width: var(--width-rule, auto);
-  white-space: nowrap; }
-
-io-filter-list [data-info="rule"] .content {
-  overflow: hidden;
-  text-overflow: ellipsis; }
-
-io-filter-list [data-info="rule"] .content:focus {
-  text-overflow: initial; }
-
-io-filter-list tr.invalid {
-  background-color: #f1d1d1; }
-
-io-filter-list tr.invalid [data-info="rule"] {
-  color: #c11d26; }
-
-html:not([dir="rtl"]) io-filter-list [data-info="rule"],
-html:not([dir="rtl"]) io-filter-list [data-info="status"] {
-  text-align: left; }
-
-html[dir="rtl"] io-filter-list [data-info="rule"],
-html[dir="rtl"] io-filter-list [data-info="status"] {
-  text-align: right; }
-
-io-filter-list [data-info="selected"],
-io-filter-list [data-info="warning"] {
-  width: 72px; }
-
-io-filter-list td[data-info="warning"] {
-  color: #bcbcbc; }
-
-io-filter-list thead th::after {
-  display: inline-block;
-  visibility: hidden;
-  position: absolute;
-  padding: 4px;
-  font-size: 8px; }
-
-io-filter-list thead[data-dir="asc"] th::after {
-  content: "▼"; }
-
-io-filter-list thead[data-dir="desc"] th::after {
-  content: "▲"; }
-
-io-filter-list thead[data-sort="status"] th[data-info="status"]::after,
-io-filter-list thead[data-sort="rule"] th[data-info="rule"]::after,
-io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after {
-  visibility: visible; }
-
-io-filter-list > io-scrollbar {
-  position: absolute;
-  top: 46px;
-  bottom: 8px;
-  opacity: 0;
-  transition: opacity 0.3s ease-in; }
-
-io-filter-list:hover > io-scrollbar {
-  opacity: 1; }
-
-html:not([dir="rtl"]) io-filter-list > io-scrollbar {
-  right: 12px; }
-
-html[dir="rtl"] io-filter-list > io-scrollbar {
-  left: 12px; }
-
-io-filter-list io-toggle {
-  margin-top: 2px;
-  vertical-align: top; }
-
-html:not([dir="rtl"]) io-filter-list io-toggle {
-  margin-right: 8px; }
-
-html[dir="rtl"] io-filter-list io-toggle {
-  margin-left: 8px; }
-
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
  * Copyright (C) 2006-present eyeo GmbH
@@ -240,45 +101,33 @@ html[dir="rtl"] io-filter-list io-toggle {
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
-io-scrollbar {
-  /*
-    related to the container height, as in ░▓░░░░░░░░░░░
-    or width, in case it's a vertical scrollbar
-  */
-  --size: 8px;
-  overflow: hidden;
-  cursor: default;
-  user-select: none; }
+io-checkbox {
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 2px;
+  padding: 0px;
+  border: 0.2rem solid transparent;
+  cursor: pointer; }
 
-io-scrollbar,
-io-scrollbar > .slider {
-  display: block;
-  box-sizing: border-box;
-  padding: 0; }
-
-io-scrollbar > .slider {
-  margin: 0;
-  border: 0;
-  opacity: 0.7;
-  background-color: #d8d8d8;
-  font-size: 0;
-  line-height: 0; }
-
-io-scrollbar[direction="horizontal"] {
-  height: var(--size); }
-
-io-scrollbar[direction="vertical"] {
-  width: var(--size); }
-
-io-scrollbar[direction="horizontal"] > .slider {
-  width: var(--slider-size, var(--size));
-  height: 100%;
-  transform: translateX(var(--position, 0)); }
-
-io-scrollbar[direction="vertical"] > .slider {
+io-checkbox > button {
   width: 100%;
-  height: var(--slider-size, var(--size));
-  transform: translateY(var(--position, 0)); }
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  background-image: url(icons/checkbox.svg?off#off);
+  background-repeat: no-repeat;
+  background-size: contain; }
+
+io-checkbox[disabled] > button {
+  outline: none;
+  opacity: 0.5;
+  cursor: default; }
+
+io-checkbox[checked] > button {
+  background-image: url(icons/checkbox.svg?on#on); }
 
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
@@ -353,6 +202,214 @@ io-toggle button:focus,
 io-toggle button[aria-checked="true"]:focus {
   border: 2px solid #87bffe; }
 
+/*
+ * This file is part of Adblock Plus <https://adblockplus.org/>,
+ * Copyright (C) 2006-present eyeo GmbH
+ *
+ * Adblock Plus is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * Adblock Plus is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
+ */
+io-scrollbar {
+  /*
+    related to the container height, as in ░▓░░░░░░░░░░░
+    or width, in case it's a vertical scrollbar
+  */
+  --size: 12px;
+  overflow: hidden;
+  cursor: default;
+  user-select: none; }
+
+io-scrollbar,
+io-scrollbar > .slider {
+  display: block;
+  box-sizing: border-box;
+  padding: 0; }
+
+io-scrollbar > .slider {
+  margin: 0;
+  border: 1px solid #979797;
+  background-color: #d8d8d8;
+  font-size: 0;
+  line-height: 0; }
+
+io-scrollbar[direction="horizontal"] {
+  height: var(--size); }
+
+io-scrollbar[direction="vertical"] {
+  width: var(--size); }
+
+io-scrollbar[direction="horizontal"] > .slider {
+  width: var(--slider-size, var(--size));
+  height: 100%;
+  transform: translateX(var(--position, 0)); }
+
+io-scrollbar[direction="vertical"] > .slider {
+  width: 100%;
+  height: var(--slider-size, var(--size));
+  transform: translateY(var(--position, 0)); }
+
+/*
+  The component depends on its style and it will look for the
+  --io-filter-list property to ensure the CSS has been loaded.
+  The property is also named like the component on purpose,
+  to be sure its an own property, not something inherited.
+*/
+io-filter-list {
+  --io-filter-list: ready;
+  width: 100%;
+  padding: 0; }
+
+io-filter-list,
+io-filter-list *,
+io-filter-list *::before,
+io-filter-list *::after {
+  box-sizing: border-box; }
+
+io-filter-list table {
+  color: #505050;
+  background-color: #fff; }
+
+io-filter-list table {
+  width: 100%;
+  border: 1px solid #bcbcbc;
+  user-select: none; }
+
+io-filter-list thead tr,
+io-filter-list td {
+  border-bottom: 1px solid #bcbcbc; }
+
+io-filter-list tr.empty td,
+io-filter-list tr:last-child td {
+  border-bottom: 0; }
+
+/* necessary to have scrollable tbody */
+io-filter-list thead,
+io-filter-list tbody {
+  display: block; }
+
+io-filter-list tr {
+  display: flex; }
+
+io-filter-list tbody {
+  overflow: hidden;
+  height: 300px; }
+
+io-filter-list th,
+io-filter-list td {
+  min-width: 24px;
+  padding: 4px 8px;
+  text-align: center; }
+
+io-filter-list th {
+  padding: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease-in; }
+
+io-filter-list th:hover {
+  background-color: #f6f6f6; }
+
+io-filter-list tbody tr {
+  height: var(--row-height, auto);
+  outline: none; }
+
+io-filter-list tbody tr.odd.selected,
+io-filter-list tbody tr.selected {
+  background-color: #f6f6f6; }
+
+io-filter-list [data-column="rule"] {
+  width: var(--rule-width, auto);
+  white-space: nowrap;
+  flex-grow: 1; }
+
+io-filter-list [data-column="rule"] .content {
+  overflow: hidden;
+  text-overflow: ellipsis; }
+
+io-filter-list [data-column="rule"] .saved {
+  animation-name: saved-animation;
+  animation-duration: 0.2s; }
+
+io-filter-list [data-column="rule"] .content:focus {
+  text-overflow: initial; }
+
+html:not([dir="rtl"]) io-filter-list [data-column="rule"] {
+  text-align: left; }
+
+html[dir="rtl"] io-filter-list [data-column="rule"] {
+  text-align: right; }
+
+io-filter-list [data-column="status"],
+io-filter-list [data-column="selected"],
+io-filter-list [data-column="warning"] {
+  width: 72px; }
+
+io-filter-list [data-column="warning"] img {
+  width: 1em;
+  height: 1em; }
+
+io-filter-list td[data-column="warning"] img {
+  opacity: 0.5; }
+
+io-filter-list thead th:not([data-column="selected"])::after {
+  display: inline-block;
+  position: absolute;
+  padding: 4px;
+  opacity: 0.3;
+  font-size: 0.7em;
+  line-height: 1rem; }
+
+io-filter-list thead th[data-column="status"]::after {
+  position: initial; }
+
+io-filter-list thead th:not([data-column="selected"])::after {
+  content: "▲"; }
+
+io-filter-list thead[data-dir="desc"] th:not([data-column="selected"])::after {
+  content: "▼"; }
+
+io-filter-list thead[data-sort="status"] th[data-column="status"]::after,
+io-filter-list thead[data-sort="rule"] th[data-column="rule"]::after,
+io-filter-list thead[data-sort="warning"] th[data-column="warning"]::after {
+  opacity: 1; }
+
+io-filter-list table {
+  position: relative; }
+
+io-filter-list io-scrollbar {
+  position: absolute;
+  top: 46px;
+  bottom: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease-in; }
+
+io-filter-list:hover io-scrollbar {
+  opacity: 1; }
+
+html:not([dir="rtl"]) io-filter-list io-scrollbar {
+  right: 12px; }
+
+html[dir="rtl"] io-filter-list io-scrollbar {
+  left: 12px; }
+
+io-filter-list io-toggle {
+  margin-top: 2px;
+  vertical-align: top; }
+
+@keyframes saved-animation {
+  from {
+    background: #bcffbc; }
+  to {
+    background: default; } }
+
 io-filter-table {
   display: flex;
   flex-direction: column;
@@ -373,14 +430,42 @@ io-filter-table .footer {
 
 io-filter-table .footer button {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 4px;
   font-weight: 400; }
 
 io-filter-table .footer .delete {
   border: 2px solid #db394b;
   color: #db394b; }
 
+io-filter-table .footer .delete::before {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  background-image: url(icons/trash.svg?red#red);
+  background-repeat: no-repeat;
+  background-size: cover;
+  content: "";
+  transform: translateY(2px); }
+
 io-filter-table .footer .copy {
   margin: auto 16px;
   border: 2px solid #337ba2;
   color: #337ba2; }
+
+io-filter-table .footer .copy::before {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  background-image: url(icons/trash.svg?red#red);
+  background-repeat: no-repeat;
+  background-size: cover;
+  content: "";
+  transform: translateY(2px); }
+
+html:not([dir="rtl"]) io-filter-table .footer .delete::before,
+html:not([dir="rtl"]) io-filter-table .footer .copy::before {
+  margin-right: 4px; }
+
+html[dir="rtl"] io-filter-table .footer .delete::before,
+html[dir="rtl"] io-filter-table .footer .copy::before {
+  margin-left: 4px; }

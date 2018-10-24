@@ -351,6 +351,8 @@ const {$} = require("./dom");
 
 const prevFilterText = new WeakMap();
 
+const port = browser.runtime.connect({name: "ui"});
+
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
 {
@@ -415,7 +417,8 @@ class IOFilterList extends IOElement
     // in such case, just execute later on until the CSS is parsed
     if (!this.isStyled())
     {
-      setTimeout(() => this.filters = value, 10);
+      this._filters = value;
+      window.addEventListener("load", this);
       return;
     }
     this.selected = [];
@@ -426,7 +429,7 @@ class IOFilterList extends IOElement
     // set current flex grown rule column
     this.style.setProperty(
       "--rule-width",
-      $('[data-info="rule"]', this).clientWidth + "px"
+      $('[data-column="rule"]', this).clientWidth + "px"
     );
     // if filters have more than a row
     // prepare the table with a new state
@@ -453,6 +456,7 @@ class IOFilterList extends IOElement
 
   created()
   {
+    setupPort.call(this);
     this.scrollbar = new IOScrollbar();
     this.scrollbar.direction = "vertical";
     this.scrollbar.addEventListener("scroll", () =>
@@ -494,12 +498,24 @@ class IOFilterList extends IOElement
   scrollTo(row)
   {
     const {rowHeight, scrollHeight} = this.state;
-    this.setState({
-      scrollTop: Math.min(
-        scrollHeight,
-        this.filters.findIndex(filter => filter === row) * rowHeight
-      )
-    });
+    const index = typeof row === "string" ?
+      this.filters.findIndex(filter => filter.text === row) :
+      this.filters.findIndex(filter => filter === row);
+    if (index < 0)
+      console.error("invalid filter", row);
+    else
+      this.setState({
+        scrollTop: Math.min(
+          scrollHeight,
+          index * rowHeight
+        )
+      });
+  }
+
+  onload()
+  {
+    window.removeEventListener("load", this);
+    this.filters = this._filters;
   }
 
   onheaderclick(event)
@@ -507,8 +523,8 @@ class IOFilterList extends IOElement
     const th = event.target.closest("th");
     if (!utils.event.isLeftClick(event) || !th)
       return;
-    const {info} = th.dataset;
-    if (info === "selected")
+    const {column} = th.dataset;
+    if (column === "selected")
     {
       const ioCheckbox = event.target.closest("io-checkbox");
       // ignore clicks outside the io-checkbox
@@ -518,14 +534,14 @@ class IOFilterList extends IOElement
     }
     event.preventDefault();
     const {sort, sortMap} = this.state;
-    if (info !== sort.current)
+    if (column !== sort.current)
     {
-      sort.current = info;
+      sort.current = column;
       sort.asc = false;
     }
     sort.asc = !sort.asc;
     const sorter = sort.asc ? 1 : -1;
-    const property = sortMap[info];
+    const property = sortMap[column];
     const direction = property === "slow" ? -1 : 1;
     this.filters.sort((fa, fb) =>
     {
@@ -535,7 +551,7 @@ class IOFilterList extends IOElement
     });
     this.render();
     const dataset = th.closest("thead").dataset;
-    dataset.sort = info;
+    dataset.sort = column;
     dataset.dir = sort.asc ? "asc" : "desc";
   }
 
@@ -591,9 +607,14 @@ class IOFilterList extends IOElement
     {
       // drop any validation action at distance
       this._validating = 0;
-      replaceFilter.call(this, filter, currentTarget);
-      if (isEnter)
-        focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
+      if (this.filters.some(f => f.text === filter.text && f !== filter))
+        dispatchError.call(this, "filter.duplicated", filter);
+      else
+      {
+        replaceFilter.call(this, filter, currentTarget);
+        if (isEnter)
+          focusTheNextFilterIfAny.call(this, currentTarget.closest("tr"));
+      }
       return;
     }
 
@@ -687,17 +708,17 @@ class IOFilterList extends IOElement
   onchange(event)
   {
     const td = event.currentTarget.closest("td");
-    if (td.dataset.info === "status")
+    if (td.dataset.column === "status")
     {
       const filter = getFilter(event);
       filter.disabled = !filter.disabled;
+      browser.runtime.sendMessage({
+        type: "filters.toggle",
+        text: filter.text,
+        disabled: filter.disabled
+      });
     }
     this.render();
-  }
-
-  onmousedown(event)
-  {
-    $(".content", event.currentTarget).focus();
   }
 
   postRender(list)
@@ -712,7 +733,7 @@ class IOFilterList extends IOElement
     {
       this.setState({
         tbody: tbody || $("tbody", this),
-        filters: list.concat(Object.create(list[0] || {}))
+        filters: list.concat({})
       });
     }
   }
@@ -726,7 +747,7 @@ class IOFilterList extends IOElement
       const {rowHeight, scrollTop, viewHeight} = this.state;
       const length = this.state.filters.length;
       let count = 0;
-      let i = Math.max(0, Math.floor(scrollTop / rowHeight));
+      let i = Math.floor(scrollTop / rowHeight);
       // always add an extra row to make scrolling smooth
       while ((count * rowHeight) < (viewHeight + rowHeight))
       {
@@ -735,10 +756,10 @@ class IOFilterList extends IOElement
     }
     this.html`<table cellpadding="0" cellspacing="0">
       <thead onclick="${this}" data-call="onheaderclick">
-        <th data-info="selected"><io-checkbox /></th>
-        <th data-info="status"></th>
-        <th data-info="rule">${{i18n: "options_filter_list_rule"}}</th>
-        <th data-info="warning">${
+        <th data-column="selected"><io-checkbox /></th>
+        <th data-column="status"></th>
+        <th data-column="rule">${{i18n: "options_filter_list_rule"}}</th>
+        <th data-column="warning">${
           // for the header, just return always the same warning icon
           warnings.get(this) || createImageFor(warnings, this)
         }</th>
@@ -751,9 +772,12 @@ class IOFilterList extends IOElement
 
   sortBy(type, isAscending)
   {
-    const th = $(`th[data-info="${type}"]`, this);
+    const th = $(`th[data-column="${type}"]`, this);
     if (!th)
+    {
+      console.error(`unable to sort by ${type}`);
       return;
+    }
     const {sort} = this.state;
     sort.current = type;
     // sort.asc is flipped with current state
@@ -778,6 +802,19 @@ IOFilterList.define("io-filter-list");
 
 module.exports = IOFilterList;
 
+// delegates the handling of errors
+function dispatchError(reason, filter)
+{
+  this.dispatchEvent(new CustomEvent("error", {
+    cancelable: false,
+    bubbles: true,
+    detail: {
+      reason,
+      filter
+    }
+  }));
+}
+
 // Please note: the contenteditable=${...} attribute
 // cannot be set directly to the TD because of an ugly
 // MS Edge bug that does not allow TDs to be editable.
@@ -788,16 +825,16 @@ function getRow(filter, i)
     const selected = this.selected.has(filter);
     return wire(filter)`
     <tr class="${selected ? "selected" : ""}">
-      <td data-info="selected">
+      <td data-column="selected">
         <io-checkbox
           checked="${selected}"
           onclick="${this}" onchange="${this}"
         />
       </td>
-      <td data-info="status">
+      <td data-column="status">
         <io-toggle checked="${!filter.disabled}" onchange="${this}" />
       </td>
-      <td data-info="rule" onmousedown="${this}">
+      <td data-column="rule">
         <div
           class="content"
           contenteditable="${!this.disabled}"
@@ -809,7 +846,7 @@ function getRow(filter, i)
           data="${filter}"
         >${filter.text}</div>
       </td>
-      <td data-info="warning">
+      <td data-column="warning">
         ${getWarning(filter)}
       </td>
     </tr>`;
@@ -817,10 +854,10 @@ function getRow(filter, i)
   // no filter results into an empty, not editable, row
   return wire(this, `:${i}`)`
     <tr class="empty">
-      <td data-info="selected"></td>
-      <td data-info="status"></td>
-      <td data-info="rule"></td>
-      <td data-info="warning"></td>
+      <td data-column="selected"></td>
+      <td data-column="status"></td>
+      <td data-column="rule"></td>
+      <td data-column="warning"></td>
     </tr>`;
 }
 
@@ -835,7 +872,7 @@ const createImageFor = (weakMap, filter) =>
 {
   const isIssue = weakMap === issues;
   const image = new Image();
-  image.src = `icons/${isIssue ? "error" : "alert"}.svg`;
+  image.src = `skin/icons/${isIssue ? "error" : "alert"}.svg`;
   if (isIssue)
     image.title = filter.reason;
   weakMap.set(filter, image);
@@ -876,7 +913,7 @@ function dropSavedClass(event)
 function getFilter(event)
 {
   const el = event.currentTarget;
-  const div = $('td[data-info="rule"] > .content', el.closest("tr"));
+  const div = $('td[data-column="rule"] > .content', el.closest("tr"));
   return div.data;
 }
 
@@ -930,6 +967,35 @@ function setScrollbarReactiveOpacity()
     this.scrollbar.style.opacity = 1;
     document.addEventListener("pointerup", cancelOpacity);
     document.addEventListener("pointercancel", cancelOpacity);
+  });
+}
+
+// listen to filters messages and eventually
+// delegate the error handling
+function setupPort()
+{
+  port.onMessage.addListener((message) =>
+  {
+    if (message.type === "filters.respond")
+    {
+      const beFilter = message.args[0];
+      const filter = this.filters.find(f => f.text === beFilter.text);
+      switch (message.action)
+      {
+        case "added":
+          if (filter.disabled)
+            dispatchError.call(this, "filter.added", filter);
+          filter.disabled = false;
+          this.render();
+          break;
+        case "removed":
+          if (!filter.disabled)
+            dispatchError.call(this, "filter.removed", filter);
+          filter.disabled = true;
+          this.render();
+          break;
+      }
+    }
   });
 }
 

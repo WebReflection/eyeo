@@ -200,41 +200,41 @@ io-filter-list tbody tr.odd.selected,
 io-filter-list tbody tr.selected {
   background-color: #f6f6f6; }
 
-io-filter-list [data-info="rule"] {
+io-filter-list [data-column="rule"] {
   width: var(--rule-width, auto);
   white-space: nowrap;
   flex-grow: 1; }
 
-io-filter-list [data-info="rule"] .content {
+io-filter-list [data-column="rule"] .content {
   overflow: hidden;
   text-overflow: ellipsis; }
 
-io-filter-list [data-info="rule"] .saved {
+io-filter-list [data-column="rule"] .saved {
   animation-name: saved-animation;
   animation-duration: 0.2s; }
 
-io-filter-list [data-info="rule"] .content:focus {
+io-filter-list [data-column="rule"] .content:focus {
   text-overflow: initial; }
 
-html:not([dir="rtl"]) io-filter-list [data-info="rule"] {
+html:not([dir="rtl"]) io-filter-list [data-column="rule"] {
   text-align: left; }
 
-html[dir="rtl"] io-filter-list [data-info="rule"] {
+html[dir="rtl"] io-filter-list [data-column="rule"] {
   text-align: right; }
 
-io-filter-list [data-info="status"],
-io-filter-list [data-info="selected"],
-io-filter-list [data-info="warning"] {
+io-filter-list [data-column="status"],
+io-filter-list [data-column="selected"],
+io-filter-list [data-column="warning"] {
   width: 72px; }
 
-io-filter-list [data-info="warning"] img {
+io-filter-list [data-column="warning"] img {
   width: 1em;
   height: 1em; }
 
-io-filter-list td[data-info="warning"] img {
+io-filter-list td[data-column="warning"] img {
   opacity: 0.5; }
 
-io-filter-list thead th:not([data-info="selected"])::after {
+io-filter-list thead th:not([data-column="selected"])::after {
   display: inline-block;
   position: absolute;
   padding: 4px;
@@ -242,18 +242,18 @@ io-filter-list thead th:not([data-info="selected"])::after {
   font-size: 0.7em;
   line-height: 1rem; }
 
-io-filter-list thead th[data-info="status"]::after {
+io-filter-list thead th[data-column="status"]::after {
   position: initial; }
 
-io-filter-list thead th:not([data-info="selected"])::after {
+io-filter-list thead th:not([data-column="selected"])::after {
   content: "▲"; }
 
-io-filter-list thead[data-dir="desc"] th:not([data-info="selected"])::after {
+io-filter-list thead[data-dir="desc"] th:not([data-column="selected"])::after {
   content: "▼"; }
 
-io-filter-list thead[data-sort="status"] th[data-info="status"]::after,
-io-filter-list thead[data-sort="rule"] th[data-info="rule"]::after,
-io-filter-list thead[data-sort="warning"] th[data-info="warning"]::after {
+io-filter-list thead[data-sort="status"] th[data-column="status"]::after,
+io-filter-list thead[data-sort="rule"] th[data-column="rule"]::after,
+io-filter-list thead[data-sort="warning"] th[data-column="warning"]::after {
   opacity: 1; }
 
 io-filter-list table {

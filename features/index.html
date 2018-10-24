@@ -131,6 +131,9 @@
         if (document.body.closest('body') !== document.body)
           throw new Error('closest not working as standard');
       },
+      function customElementsV0() {
+        eval('document.registerElement("io-base",{prototype:Object.create(HTMLElement.prototype)});');
+      },
       function customElementsV1() {
         eval('customElements.define("io-test", class extends HTMLElement {})');
       },
@@ -203,7 +206,14 @@
         }
       },
       function writableVariables() {
+        document.body.style.setProperty('--unknown-variable', 200);
+        document.body.offsetHeight;
+        if (getComputedStyle(document.body, null).getPropertyValue('--unknown-variable') != 200)
+          throw new Error('nope');
+      },
+      function overwritableVariables() {
         document.body.style.setProperty('--variable', 200);
+        document.body.offsetHeight;
         if (getComputedStyle(document.body, null).getPropertyValue('--variable') != 200)
           throw new Error('nope');
       }
