@@ -31,22 +31,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
  */
-/*
- * This file is part of Adblock Plus <https://adblockplus.org/>,
- * Copyright (C) 2006-present eyeo GmbH
- *
- * Adblock Plus is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
- * published by the Free Software Foundation.
- *
- * Adblock Plus is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Adblock Plus.  If not, see <http://www.gnu.org/licenses/>.
- */
 io-filter-search {
   display: flex;
   flex-direction: row;
@@ -437,30 +421,26 @@ io-filter-table .footer .delete {
   border: 2px solid #db394b;
   color: #db394b; }
 
-io-filter-table .footer .delete::before {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  background-image: url(icons/trash.svg?red#red);
-  background-repeat: no-repeat;
-  background-size: cover;
-  content: "";
-  transform: translateY(2px); }
-
 io-filter-table .footer .copy {
   margin: auto 16px;
   border: 2px solid #337ba2;
   color: #337ba2; }
 
+io-filter-table .footer .delete::before,
 io-filter-table .footer .copy::before {
   display: inline-block;
   width: 1rem;
   height: 1rem;
-  background-image: url(icons/trash.svg?red#red);
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: contain;
   content: "";
   transform: translateY(2px); }
+
+io-filter-table .footer .delete::before {
+  background-image: url(icons/trash.svg?red#red); }
+
+io-filter-table .footer .copy::before {
+  background-image: url(icons/copy.svg); }
 
 html:not([dir="rtl"]) io-filter-table .footer .delete::before,
 html:not([dir="rtl"]) io-filter-table .footer .copy::before {

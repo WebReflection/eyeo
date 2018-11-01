@@ -1344,10 +1344,18 @@ class IOFilterTable extends IOElement
     switch (event.currentTarget.className)
     {
       case "delete":
+        let resolved = null;
         for (const filter of this.list.selected)
         {
           this.list.selected.delete(filter);
           this.filters.splice(this.filters.indexOf(filter), 1);
+          resolved = Promise.resolve(resolved).then(() =>
+          {
+            browser.runtime.sendMessage({
+              type: "filters.remove",
+              text: filter.text
+            });
+          });
         }
         updateList(this.list);
         // after deleting all there's no reason
@@ -1375,15 +1383,25 @@ class IOFilterTable extends IOElement
                         filter => filter.text === text
                       ) || {text, new: true};
                     });
-    for (const filter of filters)
+    browser.runtime.sendMessage({
+      type: "filters.importRaw",
+      text: filters.join("\n")
+    })
+    .then(errors =>
     {
-      if (!filter.new)
-        this.filters.splice(this.filters.indexOf(filter), 1);
-      this.filters.unshift(filter);
-    }
-    updateList(this.list);
-    this.list.scrollTo(this.filters[0]);
-    setTimeout(() => this.search.value = "");
+      if (!errors.length)
+      {
+        for (const filter of filters)
+        {
+          if (!filter.new)
+            this.filters.splice(this.filters.indexOf(filter), 1);
+          this.filters.unshift(filter);
+        }
+        updateList(this.list);
+        this.list.scrollTo(this.filters[0]);
+        setTimeout(() => this.search.value = "");
+      }
+    });
   }
 
   onFilterMatch(event)

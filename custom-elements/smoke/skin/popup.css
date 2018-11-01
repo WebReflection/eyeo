@@ -203,7 +203,7 @@ footer {
 
 header h1 {
   color: var(--color-secondary);
-  background-image: url(abp-logo.svg);
+  background-image: url(icons/abp-logo.svg);
   background-repeat: no-repeat;
   background-size: 24px;
   font-size: var(--font-size-big);
@@ -306,13 +306,13 @@ header .notification button {
   margin-top: var(--margin-primary-half); }
 
 #options {
-  min-width: var(--font-size-big);
+  flex-shrink: 0;
+  width: var(--font-size-big);
+  height: var(--font-size-big);
   border: 0;
   opacity: 0.5;
-  background-image: url(icons/options.svg);
+  background-image: url(icons/gear.svg?background#background);
   background-repeat: no-repeat;
-  background-position: center;
-  background-size: var(--font-size-big);
   transition: opacity 0.1s ease-in; }
 
 #options:hover {
