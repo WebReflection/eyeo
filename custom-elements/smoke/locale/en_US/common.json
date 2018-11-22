@@ -1,1 +1,14 @@
-{}
+{
+  "error": {
+    "description": "Generic error",
+    "message": "Error"
+  },
+  "copy-selected": {
+    "description": "Copy selected items button label",
+    "message": "Copy Selected"
+  },
+  "delete": {
+    "description": "Delete button label",
+    "message": "Delete"
+  }
+}

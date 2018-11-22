@@ -22,6 +22,9 @@ module.exports = {
   $: (selector, container = document) => container.querySelector(selector),
   $$: (selector, container = document) => container.querySelectorAll(selector),
 
+  // helper to format as indented string any HTML/XML node
+  asIndentedString,
+
   // basic copy and paste clipboard utility
   clipboard: {
     // warning: Firefox needs a proper event to work
@@ -64,6 +67,12 @@ module.exports = {
   // to the closest positioned containing element
   relativeCoordinates(event)
   {
+    // good old way that will work properly in older browsers too
+    // mandatory for Chrome 49, still better than manual fallback
+    // in all other browsers that provide such functionality
+    if ("layerX" in event && "layerY" in event)
+      return {x: event.layerX, y: event.layerY};
+    // fallback when layerX/Y will be removed (since deprecated)
     let el = event.currentTarget;
     let x = 0;
     let y = 0;
@@ -79,6 +88,43 @@ module.exports = {
     return {x: event.pageX - x, y: event.pageY - y};
   }
 };
+
+function asIndentedString(element, indentation = 0)
+{
+  // only the first time it's called
+  if (!indentation)
+  {
+    // get the top meaningful element to parse
+    if (element.nodeType === 9)
+      element = element.documentElement;
+    // accept only elements
+    if (element.nodeType !== 1)
+      throw new Error("Unable to serialize " + element);
+    // avoid original XML pollution at first iteration
+    element = element.cloneNode(true);
+  }
+  const before = "  ".repeat(indentation + 1);
+  const after = "  ".repeat(indentation);
+  const doc = element.ownerDocument;
+  const children = element.children;
+  const length = children.length;
+  for (let i = 0; i < length; i++)
+  {
+    const child = children[i];
+    element.insertBefore(doc.createTextNode(`\n${before}`), child);
+    asIndentedString(child, indentation + 1);
+    if ((i + 1) === length)
+      element.appendChild(doc.createTextNode(`\n${after}`));
+  }
+  // inner calls don't need to bother serialization
+  if (indentation)
+    return "";
+  // easiest way to recognize an HTML element from an XML one
+  if (/^https?:\/\/www\.w3\.org\/1999\/xhtml$/.test(element.namespaceURI))
+    return element.outerHTML;
+  // all other elements should use XML serializer
+  return new XMLSerializer().serializeToString(element);
+}
 
 },{}],2:[function(require,module,exports){
 /*
@@ -488,8 +534,7 @@ class IOFilterList extends IOElement
           scrollTop: getScrollTop(scrollTop + event.deltaY, scrollHeight)
         });
         // update the scrollbar position accordingly
-        const {range} = this.scrollbar;
-        this.scrollbar.position = this.state.scrollTop * range / scrollHeight;
+        updateScrollbarPosition.call(this);
       },
       {passive: false}
     );
@@ -509,6 +554,7 @@ class IOFilterList extends IOElement
       this.setState({
         scrollTop: getScrollTop(index * rowHeight, scrollHeight)
       });
+      updateScrollbarPosition.call(this);
     }
   }
 
@@ -1001,6 +1047,13 @@ function setupPort()
   });
 }
 
+function updateScrollbarPosition()
+{
+  const {scrollbar, state} = this;
+  const {scrollHeight, scrollTop} = state;
+  scrollbar.position = scrollTop * scrollbar.range / scrollHeight;
+}
+
 },{"./dom":1,"./io-checkbox":2,"./io-element":3,"./io-scrollbar":7,"./io-toggle":8}],5:[function(require,module,exports){
 /*
  * This file is part of Adblock Plus <https://adblockplus.org/>,
@@ -1157,8 +1210,6 @@ class IOFilterSearch extends IOElement
       const result = search.call(this, value);
       if (result.accuracy && match <= result.accuracy)
         dispatch.call(this, "filter:match", result);
-      else if (!value.length)
-        this.disabled = true;
     }, 100);
   }
 
@@ -1289,11 +1340,20 @@ const {bind, wire} = IOElement;
 // used to relate the search and the list
 class IOFilterTable extends IOElement
 {
-  static get booleanAttributes() { return ["disabled"]; }
+  static get booleanAttributes()
+  {
+    return ["disabled"];
+  }
 
-  static get observedAttributes() { return ["match"]; }
+  static get observedAttributes()
+  {
+    return ["match"];
+  }
 
-  get defaultState() { return {filters: [], match: -1, ready: false}; }
+  get defaultState()
+  {
+    return {filters: [], match: -1, ready: false};
+  }
 
   created()
   {
@@ -1308,7 +1368,9 @@ class IOFilterTable extends IOElement
       event => this.onFilterMatch(event)
     );
     this.list = this.appendChild(new IOFilterList());
-    this.footer = this.appendChild(wire()`<div/>`);
+    this.footer = this.appendChild(wire()`<div class="footer" />`);
+    this.addEventListener("click", this);
+    this.addEventListener("error", this);
     this.setState({ready: true});
   }
 
@@ -1341,9 +1403,39 @@ class IOFilterTable extends IOElement
 
   onclick(event)
   {
-    switch (event.currentTarget.className)
+    if (event.target.closest("io-checkbox"))
     {
-      case "delete":
+      this.footer.classList.toggle("visible", !!this.list.selected.size);
+    }
+  }
+
+  onerror(event)
+  {
+    const {i18n} = browser;
+    const {filter, reason} = event.detail;
+    const node = this.querySelector(".footer .error");
+    if (filter)
+      node.dataset.filter = filter;
+    else
+      delete node.dataset.filter;
+    bind(node)`<strong>${i18n.getMessage("error")}</strong>: ${reason}`;
+  }
+
+  onerrorclick(event)
+  {
+    const {filter} = event.currentTarget.dataset;
+    if (filter)
+    {
+      this.list.scrollTo(filter);
+    }
+  }
+
+  onfooterclick(event)
+  {
+    const {classList} = event.currentTarget;
+    switch (true)
+    {
+      case classList.contains("delete"):
         let resolved = null;
         for (const filter of this.list.selected)
         {
@@ -1351,7 +1443,7 @@ class IOFilterTable extends IOElement
           this.filters.splice(this.filters.indexOf(filter), 1);
           resolved = Promise.resolve(resolved).then(() =>
           {
-            browser.runtime.sendMessage({
+            return browser.runtime.sendMessage({
               type: "filters.remove",
               text: filter.text
             });
@@ -1362,7 +1454,7 @@ class IOFilterTable extends IOElement
         // to keep the column selected
         $('th[data-column="selected"] io-checkbox', this).checked = false;
         break;
-      case "copy":
+      case classList.contains("copy"):
         const filters = [];
         for (const filter of this.list.selected)
         {
@@ -1385,7 +1477,7 @@ class IOFilterTable extends IOElement
                     });
     browser.runtime.sendMessage({
       type: "filters.importRaw",
-      text: filters.join("\n")
+      text: filters.map(filter => filter.text).join("\n")
     })
     .then(errors =>
     {
@@ -1393,13 +1485,21 @@ class IOFilterTable extends IOElement
       {
         for (const filter of filters)
         {
-          if (!filter.new)
+          if (filter.new)
+            filter.new = false;
+          else
             this.filters.splice(this.filters.indexOf(filter), 1);
           this.filters.unshift(filter);
         }
         updateList(this.list);
         this.list.scrollTo(this.filters[0]);
-        setTimeout(() => this.search.value = "");
+        this.search.value = "";
+      }
+      else
+      {
+        this.onerror({detail: {
+          reason: errors.join(", ")
+        }});
       }
     });
   }
@@ -1422,16 +1522,27 @@ class IOFilterTable extends IOElement
     this.search.match = match;
     this.list.disabled = disabled;
     this.list.filters = filters;
-    this.renderBottom();
+    this.renderFooter();
   }
 
-  renderBottom()
+  renderFooter()
   {
     bind(this.footer)`
-      <div class="footer">
-        <button class="delete" onclick="${this}">DELETE</button>
-        <button class="copy" onclick="${this}">COPY SELECTED</button>
-      </div>
+      <button
+        class="delete"
+        onclick="${this}"
+        data-call="onfooterclick"
+      >${{i18n: "delete"}}</button>
+      <button
+        class="copy"
+        onclick="${this}"
+        data-call="onfooterclick"
+      >${{i18n: "copy-selected"}}</button>
+      <button
+        class="error"
+        onclick="${this}"
+        data-call="onerrorclick"
+      ></button>
     `;
   }
 }

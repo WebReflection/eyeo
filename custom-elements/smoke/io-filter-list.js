@@ -352,6 +352,10 @@ const {$} = require("./dom");
 const prevFilterText = new WeakMap();
 
 const port = browser.runtime.connect({name: "ui"});
+port.postMessage({
+  type: "filters.listen",
+  filter: ["disabled"]
+});
 
 // <io-filter-list disabled />.{filters = [...]}
 class IOFilterList extends IOElement
@@ -464,7 +468,7 @@ class IOFilterList extends IOElement
       const {position, range} = this.scrollbar;
       const {scrollHeight} = this.state;
       this.setState({
-        scrollTop: scrollHeight * position / range
+        scrollTop: getScrollTop(scrollHeight * position / range)
       });
     });
     this.addEventListener(
@@ -481,10 +485,7 @@ class IOFilterList extends IOElement
         }
         const {scrollHeight, scrollTop} = this.state;
         this.setState({
-          scrollTop: Math.max(
-            0,
-            Math.min(scrollHeight, scrollTop + event.deltaY)
-          )
+          scrollTop: getScrollTop(scrollTop + event.deltaY, scrollHeight)
         });
         // update the scrollbar position accordingly
         const {range} = this.scrollbar;
@@ -504,12 +505,12 @@ class IOFilterList extends IOElement
     if (index < 0)
       console.error("invalid filter", row);
     else
+    {
       this.setState({
-        scrollTop: Math.min(
-          scrollHeight,
-          index * rowHeight
-        )
+        scrollTop: getScrollTop(index * rowHeight, scrollHeight)
       });
+      this.updateScrollbar();
+    }
   }
 
   onload()
@@ -893,7 +894,7 @@ function focusTheNextFilterIfAny(tr)
     if (next.offsetTop > viewHeight)
     {
       this.setState({
-        scrollTop: scrollTop + rowHeight
+        scrollTop: getScrollTop(scrollTop + rowHeight)
       });
     }
     // focus its content field
@@ -915,6 +916,17 @@ function getFilter(event)
   const el = event.currentTarget;
   const div = $('td[data-column="rule"] > .content', el.closest("tr"));
   return div.data;
+}
+
+// ensure the number is always between 0 and a positive number
+// specially handy when filters are erased and the viewHeight
+// is higher than scrollHeight and other cases too
+function getScrollTop(value, scrollHeight)
+{
+  return Math.max(
+    0,
+    Math.min(scrollHeight || Infinity, value)
+  );
 }
 
 function getWarning(filter)
@@ -976,24 +988,15 @@ function setupPort()
 {
   port.onMessage.addListener((message) =>
   {
-    if (message.type === "filters.respond")
+    if (message.type === "filters.respond" && message.action === "disabled")
     {
-      const beFilter = message.args[0];
+      const [beFilter, value] = message.args;
       const filter = this.filters.find(f => f.text === beFilter.text);
-      switch (message.action)
+      if (value !== filter.disabled)
       {
-        case "added":
-          if (filter.disabled)
-            dispatchError.call(this, "filter.added", filter);
-          filter.disabled = false;
-          this.render();
-          break;
-        case "removed":
-          if (!filter.disabled)
-            dispatchError.call(this, "filter.removed", filter);
-          filter.disabled = true;
-          this.render();
-          break;
+        dispatchError.call(this, "filter.disabled", filter);
+        filter.disabled = value;
+        this.render();
       }
     }
   });

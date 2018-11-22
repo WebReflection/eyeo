@@ -294,9 +294,12 @@ io-filter-list td {
   text-align: center; }
 
 io-filter-list th {
+  display: flex;
   padding: 8px;
   cursor: pointer;
-  transition: background 0.2s ease-in; }
+  transition: background 0.2s ease-in;
+  justify-content: center;
+  align-items: center; }
 
 io-filter-list th:hover {
   background-color: #f6f6f6; }
@@ -345,14 +348,11 @@ io-filter-list td[data-column="warning"] img {
 
 io-filter-list thead th:not([data-column="selected"])::after {
   display: inline-block;
-  position: absolute;
+  width: 24px;
   padding: 4px;
   opacity: 0.3;
   font-size: 0.7em;
   line-height: 1rem; }
-
-io-filter-list thead th[data-column="status"]::after {
-  position: initial; }
 
 io-filter-list thead th:not([data-column="selected"])::after {
   content: "▲"; }
@@ -410,41 +410,70 @@ io-filter-table > io-filter-list > table {
   border-top: 0; }
 
 io-filter-table .footer {
-  margin-top: 16px; }
+  display: flex;
+  visibility: hidden;
+  flex-direction: row;
+  margin-top: 16px;
+  align-items: center; }
+
+io-filter-table .footer.visible {
+  visibility: visible; }
 
 io-filter-table .footer button {
-  display: inline-block;
+  display: inline-flex;
   padding: 4px;
-  font-weight: 400; }
+  font-weight: 600;
+  justify-content: center;
+  align-content: center; }
+
+io-filter-table .footer button:not(:last-child) {
+  text-transform: uppercase; }
+
+io-filter-table .footer button:not(:first-child) {
+  margin: auto 16px; }
 
 io-filter-table .footer .delete {
   border: 2px solid #db394b;
   color: #db394b; }
 
 io-filter-table .footer .copy {
-  margin: auto 16px;
   border: 2px solid #337ba2;
   color: #337ba2; }
 
-io-filter-table .footer .delete::before,
-io-filter-table .footer .copy::before {
+io-filter-table .footer button:not(.error)::before {
   display: inline-block;
-  width: 1rem;
-  height: 1rem;
+  width: 1em;
+  height: 1em;
   background-repeat: no-repeat;
   background-size: contain;
   content: "";
-  transform: translateY(2px); }
+  transform: translateY(0.1em); }
 
 io-filter-table .footer .delete::before {
-  background-image: url(icons/trash.svg?red#red); }
+  background-image: url(icons/trash.svg?error#error); }
 
 io-filter-table .footer .copy::before {
   background-image: url(icons/copy.svg); }
 
+io-filter-table .footer .error {
+  border: 0;
+  color: #db394b;
+  text-transform: none;
+  flex-grow: 1; }
+
+io-filter-table .footer .error:not([data-filter]) {
+  outline: none;
+  cursor: default; }
+
+html:not([dir="rtl"]) io-filter-table .footer .error {
+  text-align: left; }
+
 html:not([dir="rtl"]) io-filter-table .footer .delete::before,
 html:not([dir="rtl"]) io-filter-table .footer .copy::before {
   margin-right: 4px; }
+
+html[dir="rtl"] io-filter-table .footer .error {
+  text-align: right; }
 
 html[dir="rtl"] io-filter-table .footer .delete::before,
 html[dir="rtl"] io-filter-table .footer .copy::before {
