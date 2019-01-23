@@ -298,8 +298,10 @@ io-filter-list th {
   padding: 8px;
   cursor: pointer;
   transition: background 0.2s ease-in;
-  justify-content: center;
   align-items: center; }
+
+io-filter-list th:not([data-column="rule"]) {
+  justify-content: center; }
 
 io-filter-list th:hover {
   background-color: #f6f6f6; }

@@ -22,6 +22,9 @@ module.exports = {
   $: (selector, container = document) => container.querySelector(selector),
   $$: (selector, container = document) => container.querySelectorAll(selector),
 
+  // helper to format as indented string any HTML/XML node
+  asIndentedString,
+
   // basic copy and paste clipboard utility
   clipboard: {
     // warning: Firefox needs a proper event to work
@@ -64,6 +67,12 @@ module.exports = {
   // to the closest positioned containing element
   relativeCoordinates(event)
   {
+    // good old way that will work properly in older browsers too
+    // mandatory for Chrome 49, still better than manual fallback
+    // in all other browsers that provide such functionality
+    if ("layerX" in event && "layerY" in event)
+      return {x: event.layerX, y: event.layerY};
+    // fallback when layerX/Y will be removed (since deprecated)
     let el = event.currentTarget;
     let x = 0;
     let y = 0;
@@ -79,6 +88,43 @@ module.exports = {
     return {x: event.pageX - x, y: event.pageY - y};
   }
 };
+
+function asIndentedString(element, indentation = 0)
+{
+  // only the first time it's called
+  if (!indentation)
+  {
+    // get the top meaningful element to parse
+    if (element.nodeType === 9)
+      element = element.documentElement;
+    // accept only elements
+    if (element.nodeType !== 1)
+      throw new Error("Unable to serialize " + element);
+    // avoid original XML pollution at first iteration
+    element = element.cloneNode(true);
+  }
+  const before = "  ".repeat(indentation + 1);
+  const after = "  ".repeat(indentation);
+  const doc = element.ownerDocument;
+  const children = element.children;
+  const length = children.length;
+  for (let i = 0; i < length; i++)
+  {
+    const child = children[i];
+    element.insertBefore(doc.createTextNode(`\n${before}`), child);
+    asIndentedString(child, indentation + 1);
+    if ((i + 1) === length)
+      element.appendChild(doc.createTextNode(`\n${after}`));
+  }
+  // inner calls don't need to bother serialization
+  if (indentation)
+    return "";
+  // easiest way to recognize an HTML element from an XML one
+  if (/^https?:\/\/www\.w3\.org\/1999\/xhtml$/.test(element.namespaceURI))
+    return element.outerHTML;
+  // all other elements should use XML serializer
+  return new XMLSerializer().serializeToString(element);
+}
 
 },{}],2:[function(require,module,exports){
 /*
@@ -488,8 +534,7 @@ class IOFilterList extends IOElement
           scrollTop: getScrollTop(scrollTop + event.deltaY, scrollHeight)
         });
         // update the scrollbar position accordingly
-        const {range} = this.scrollbar;
-        this.scrollbar.position = this.state.scrollTop * range / scrollHeight;
+        updateScrollbarPosition.call(this);
       },
       {passive: false}
     );
@@ -509,7 +554,7 @@ class IOFilterList extends IOElement
       this.setState({
         scrollTop: getScrollTop(index * rowHeight, scrollHeight)
       });
-      this.updateScrollbar();
+      updateScrollbarPosition.call(this);
     }
   }
 
@@ -724,6 +769,8 @@ class IOFilterList extends IOElement
 
   postRender(list)
   {
+    // const ioCheckbox = $('th[data-column="selected"] io-checkbox', this);
+    // ioCheckbox.checked = !!this.selected.length;
     const {tbody, scrollTop, rowHeight} = this.state;
     if (this.state.infinite)
     {
@@ -757,7 +804,7 @@ class IOFilterList extends IOElement
     }
     this.html`<table cellpadding="0" cellspacing="0">
       <thead onclick="${this}" data-call="onheaderclick">
-        <th data-column="selected"><io-checkbox /></th>
+        <th data-column="selected"><io-checkbox selected=${!!this.selected.length} /></th>
         <th data-column="status"></th>
         <th data-column="rule">${{i18n: "options_filter_list_rule"}}</th>
         <th data-column="warning">${
@@ -1000,6 +1047,13 @@ function setupPort()
       }
     }
   });
+}
+
+function updateScrollbarPosition()
+{
+  const {scrollbar, state} = this;
+  const {scrollHeight, scrollTop} = state;
+  scrollbar.position = scrollTop * scrollbar.range / scrollHeight;
 }
 
 },{"./dom":1,"./io-checkbox":2,"./io-element":3,"./io-scrollbar":5,"./io-toggle":6}],5:[function(require,module,exports){

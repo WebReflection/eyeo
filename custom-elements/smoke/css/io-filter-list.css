@@ -240,9 +240,12 @@ io-filter-list td {
   text-align: center; }
 
 io-filter-list th {
+  display: flex;
   padding: 8px;
   cursor: pointer;
-  transition: background 0.2s ease-in; }
+  transition: background 0.2s ease-in;
+  justify-content: center;
+  align-items: center; }
 
 io-filter-list th:hover {
   background-color: #f6f6f6; }
@@ -291,14 +294,11 @@ io-filter-list td[data-column="warning"] img {
 
 io-filter-list thead th:not([data-column="selected"])::after {
   display: inline-block;
-  position: absolute;
+  width: 24px;
   padding: 4px;
   opacity: 0.3;
   font-size: 0.7em;
   line-height: 1rem; }
-
-io-filter-list thead th[data-column="status"]::after {
-  position: initial; }
 
 io-filter-list thead th:not([data-column="selected"])::after {
   content: "▲"; }

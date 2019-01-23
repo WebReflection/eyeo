@@ -40,7 +40,7 @@ class IOCheckbox extends IOElement
 
   onclick(event)
   {
-    if (this.disabled)
+    if (!this.disabled)
     {
       this.checked = !this.checked;
       this.dispatchEvent(new CustomEvent("change", {
@@ -188,6 +188,17 @@ class IOElement extends HyperHTMLElement
 
   // whenever an element is created, render its content once
   created() { this.render(); }
+
+  // based on a `--component-name: ready;` convention
+  // under the `component-name {}` related stylesheet,
+  // this method returns true only if such stylesheet
+  // has been already loaded.
+  isStyled()
+  {
+    const computed = window.getComputedStyle(this, null);
+    const property = "--" + this.nodeName.toLowerCase();
+    return computed.getPropertyValue(property).trim() === "ready";
+  }
 
   // by default, render is a no-op
   render() {}
@@ -1777,7 +1788,8 @@ class HyperHTMLElement extends HTMLElement {
     // Boolean attributes are also automatically observed.
     const booleanAttributes = Class.booleanAttributes || [];
     booleanAttributes.forEach(name => {
-      if (!(name in proto)) defineProperty(
+      if (!(name in proto))
+        defineProperty(
         proto,
         camel(name),
         {
@@ -1807,7 +1819,8 @@ class HyperHTMLElement extends HTMLElement {
     observedAttributes.forEach(name => {
       // it is possible to redefine the behavior at any time
       // simply overwriting get prop() and set prop(value)
-      if (!(name in proto)) defineProperty(
+      if (!(name in proto))
+        defineProperty(
         proto,
         camel(name),
         {
@@ -2017,7 +2030,8 @@ class HyperHTMLElement extends HTMLElement {
     const target = this.state;
     const source = typeof state === 'function' ? state.call(this, target) : state;
     for (const key in source) target[key] = source[key];
-    if (render !== false) this.render();
+    if (render !== false)
+      this.render();
     return this;
   }
 
@@ -2031,7 +2045,8 @@ HyperHTMLElement.wire = wire;
 HyperHTMLElement.hyper = hyper;
 
 try {
-  if (Symbol.hasInstance) classes.push(
+  if (Symbol.hasInstance)
+    classes.push(
     defineProperty(HyperHTMLElement, Symbol.hasInstance, {
       enumerable: false,
       configurable: true,
@@ -2066,13 +2081,20 @@ if (!dom.ready()) {
   document.addEventListener(dom.type, dom, false);
 }
 
+
+const dafuq = new WeakSet;
 function checkReady(created) {
   if (dom.ready() || isReady.call(this, created)) {
     if (this._init$) {
+      if (dafuq.has(this))
+        throw new Error('WTF');
+      dafuq.add(this);
       const list = this._init$$;
-      if (list) delete this._init$$;
+      if (list)
+        delete this._init$$;
       created.call(defineProperty(this, '_init$', {value: false}));
-      if (list) list.forEach(invoke);
+      if (list)
+        list.forEach(invoke);
     }
   } else {
     if (!this.hasOwnProperty('_init$$'))

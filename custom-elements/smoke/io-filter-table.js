@@ -620,6 +620,7 @@ class IOFilterList extends IOElement
 
   onkeyup(event)
   {
+    window.console.log('TABLE');
     const isEnter = event.key === "Enter";
     const update = isEnter || event.type === "blur";
     const {currentTarget} = event;
@@ -800,9 +801,12 @@ class IOFilterList extends IOElement
         list[count++] = i < length ? this.state.filters[i++] : null;
       }
     }
+    const {length} = this.filters;
     this.html`<table cellpadding="0" cellspacing="0">
       <thead onclick="${this}" data-call="onheaderclick">
-        <th data-column="selected"><io-checkbox /></th>
+        <th data-column="selected">
+          <io-checkbox checked=${!!length && this.selected.size === length} />
+        </th>
         <th data-column="status"></th>
         <th data-column="rule">${{i18n: "options_filter_list_rule"}}</th>
         <th data-column="warning">${
@@ -1411,14 +1415,13 @@ class IOFilterTable extends IOElement
 
   onerror(event)
   {
-    const {i18n} = browser;
     const {filter, reason} = event.detail;
     const node = this.querySelector(".footer .error");
     if (filter)
       node.dataset.filter = filter;
     else
       delete node.dataset.filter;
-    bind(node)`<strong>${i18n.getMessage("error")}</strong>: ${reason}`;
+    bind(node)`<strong>${{i18n: "filter_action_failed"}}</strong>: ${reason}`;
   }
 
   onerrorclick(event)
@@ -1450,9 +1453,6 @@ class IOFilterTable extends IOElement
           });
         }
         updateList(this.list);
-        // after deleting all there's no reason
-        // to keep the column selected
-        $('th[data-column="selected"] io-checkbox', this).checked = false;
         break;
       case classList.contains("copy"):
         const filters = [];
@@ -1467,13 +1467,20 @@ class IOFilterTable extends IOElement
 
   onFilterAdd(event)
   {
+    const unknown = new WeakSet();
     const filters = event.detail
                     .split(/(?:\r\n|\n)/)
                     .map(text =>
                     {
-                      return this.filters.find(
+                      let value = this.filters.find(
                         filter => filter.text === text
-                      ) || {text, new: true};
+                      );
+                      if (!value)
+                      {
+                        value = {text};
+                        unknown.add(value);
+                      }
+                      return value;
                     });
     browser.runtime.sendMessage({
       type: "filters.importRaw",
@@ -1485,9 +1492,7 @@ class IOFilterTable extends IOElement
       {
         for (const filter of filters)
         {
-          if (filter.new)
-            filter.new = false;
-          else
+          if (!unknown.has(filter))
             this.filters.splice(this.filters.indexOf(filter), 1);
           this.filters.unshift(filter);
         }
@@ -1933,7 +1938,8 @@ function installCustomElements(window, polyfill) {'use strict';
       filterBy = function (re) {
         var arr = [], tag;
         for (tag in register) {
-          if (re.test(tag)) arr.push(tag);
+          if (re.test(tag))
+            arr.push(tag);
         }
         return arr;
       },
@@ -2327,7 +2333,8 @@ function installCustomElements(window, polyfill) {'use strict';
   
     
   // passed at runtime, configurable via nodejs module
-  if (typeof polyfill !== 'object') polyfill = {type: polyfill || 'auto'};
+  if (typeof polyfill !== 'object')
+    polyfill = {type: polyfill || 'auto'};
   
   var
     // V0 polyfill entry
@@ -2424,8 +2431,10 @@ function installCustomElements(window, polyfill) {'use strict';
         },
         set: function (k, v) {
           i = indexOf.call(K, k);
-          if (i < 0) V[K.push(k) - 1] = v;
-          else V[i] = v;
+          if (i < 0)
+            V[K.push(k) - 1] = v;
+          else
+            V[i] = v;
         }
       };
     },
@@ -2439,7 +2448,8 @@ function installCustomElements(window, polyfill) {'use strict';
           },
           'then': function (cb) {
             notify.push(cb);
-            if (done) setTimeout(resolve, 1);
+            if (done)
+              setTimeout(resolve, 1);
             return p;
           }
         }
@@ -2896,7 +2906,9 @@ function installCustomElements(window, polyfill) {'use strict';
         };
       }
   
-      if (justSetup) return (justSetup = false);
+      if (justSetup)
+  
+        return (justSetup = false);
   
       if (-2 < (
         indexOf.call(types, PREFIX_IS + upperType) +
@@ -2941,7 +2953,9 @@ function installCustomElements(window, polyfill) {'use strict';
           create(HTMLElementPrototype)
       );
   
-      if (query.length) loopAndVerify(
+      if (query.length)
+  
+        loopAndVerify(
         document.querySelectorAll(query),
         ATTACHED
       );
@@ -2970,7 +2984,8 @@ function installCustomElements(window, polyfill) {'use strict';
         }
       }
       notFromInnerHTMLHelper = !document.createElement.innerHTMLHelper;
-      if (setup) patch(node, protos[i]);
+      if (setup)
+        patch(node, protos[i]);
       return node;
     });
   
@@ -3003,7 +3018,8 @@ function installCustomElements(window, polyfill) {'use strict';
     return function (node) {
       if (isValidNode(node)) {
         verifyAndSetupAndAction(node, action);
-        if (query.length) loopAndVerify(
+        if (query.length)
+          loopAndVerify(
           node.querySelectorAll(query),
           action
         );
@@ -3061,7 +3077,8 @@ function installCustomElements(window, polyfill) {'use strict';
     var executor = executeAction(action);
     return function (e) {
       asapQueue.push(executor, e.target);
-      if (asapTimer) clearTimeout(asapTimer);
+      if (asapTimer)
+        clearTimeout(asapTimer);
       asapTimer = setTimeout(ASAP, 1);
     };
   }
@@ -3071,11 +3088,13 @@ function installCustomElements(window, polyfill) {'use strict';
       dropDomContentLoaded = false;
       e.currentTarget.removeEventListener(DOM_CONTENT_LOADED, onReadyStateChange);
     }
-    if (query.length) loopAndVerify(
+    if (query.length)
+      loopAndVerify(
       (e.target || document).querySelectorAll(query),
       e.detail === DETACHED ? DETACHED : ATTACHED
     );
-    if (IE8) purge();
+    if (IE8)
+      purge();
   }
   
   function patchedSetAttribute(name, value) {
@@ -3090,7 +3109,8 @@ function installCustomElements(window, polyfill) {'use strict';
       node = callback.apply(context, args),
       i = getTypeIndex(node)
     ;
-    if (-1 < i) patch(node, protos[i]);
+    if (-1 < i)
+      patch(node, protos[i]);
     if (args.pop() && query.length)
       loopAndSetup(node.querySelectorAll(query));
     return node;
@@ -3215,7 +3235,8 @@ function installCustomElements(window, polyfill) {'use strict';
     // defineProperty(proto, 'constructor', {value: Class});
     safeProperty(proto, CREATED_CALLBACK, {
         value: function () {
-          if (justCreated) justCreated = false;
+          if (justCreated)
+            justCreated = false;
           else if (!this[DRECEV1]) {
             this[DRECEV1] = true;
             new Class(this);
@@ -3246,7 +3267,8 @@ function installCustomElements(window, polyfill) {'use strict';
         value: CProto[DISCONNECTED_CALLBACK]
       });
     }
-    if (is) definition[EXTENDS] = is;
+    if (is)
+      definition[EXTENDS] = is;
     name = name.toUpperCase();
     constructors[name] = {
       constructor: Class,
@@ -3298,7 +3320,8 @@ function installCustomElements(window, polyfill) {'use strict';
   }
   
   function polyfillV1() {
-    if (customElements) delete window.customElements;
+    if (customElements)
+      delete window.customElements;
     defineProperty(window, 'customElements', {
       configurable: true,
       value: new CustomElementRegistry()
@@ -3313,7 +3336,8 @@ function installCustomElements(window, polyfill) {'use strict';
         if (Class) {
           window[name] = function CustomElementsV1(self) {
             var info, isNative;
-            if (!self) self = this;
+            if (!self)
+              self = this;
             if (!self[DRECEV1]) {
               justCreated = true;
               info = constructors[nodeNames.get(self.constructor)];
@@ -3323,7 +3347,8 @@ function installCustomElements(window, polyfill) {'use strict';
                 document.createElement.apply(document, info.create);
               self[DRECEV1] = true;
               justCreated = false;
-              if (!isNative) notifyAttributes(self);
+              if (!isNative)
+                notifyAttributes(self);
             }
             return self;
           };
@@ -3354,7 +3379,8 @@ function installCustomElements(window, polyfill) {'use strict';
   }
   
   // if customElements is not there at all
-  if (!customElements || /^force/.test(polyfill.type)) polyfillV1();
+  if (!customElements || /^force/.test(polyfill.type))
+    polyfillV1();
   else if(!polyfill.noBuiltIn) {
     // if available test extends work as expected
     try {
@@ -4736,7 +4762,8 @@ const weakly = (obj, type) => {
     id = type.slice(i + 1);
     type = type.slice(0, i) || 'html';
   }
-  if (!wire) wires.set(obj, wire = {});
+  if (!wire)
+    wires.set(obj, wire = {});
   return wire[id] || (wire[id] = content(type));
 };
 
@@ -5384,14 +5411,17 @@ const setAttribute = (node, name, original) => {
       }
       components.add(node);
     }
-    else if (name.toLowerCase() in node) {
+    else if (name.toLowerCase()
+      in node) {
       type = type.toLowerCase();
     }
     return newValue => {
       if (oldValue !== newValue) {
-        if (oldValue) node.removeEventListener(type, oldValue, false);
+        if (oldValue)
+          node.removeEventListener(type, oldValue, false);
         oldValue = newValue;
-        if (newValue) node.addEventListener(type, newValue, false);
+        if (newValue)
+          node.addEventListener(type, newValue, false);
       }
     };
   }

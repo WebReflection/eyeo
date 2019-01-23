@@ -22,6 +22,9 @@ module.exports = {
   $: (selector, container = document) => container.querySelector(selector),
   $$: (selector, container = document) => container.querySelectorAll(selector),
 
+  // helper to format as indented string any HTML/XML node
+  asIndentedString,
+
   // basic copy and paste clipboard utility
   clipboard: {
     // warning: Firefox needs a proper event to work
@@ -64,6 +67,12 @@ module.exports = {
   // to the closest positioned containing element
   relativeCoordinates(event)
   {
+    // good old way that will work properly in older browsers too
+    // mandatory for Chrome 49, still better than manual fallback
+    // in all other browsers that provide such functionality
+    if ("layerX" in event && "layerY" in event)
+      return {x: event.layerX, y: event.layerY};
+    // fallback when layerX/Y will be removed (since deprecated)
     let el = event.currentTarget;
     let x = 0;
     let y = 0;
@@ -79,6 +88,43 @@ module.exports = {
     return {x: event.pageX - x, y: event.pageY - y};
   }
 };
+
+function asIndentedString(element, indentation = 0)
+{
+  // only the first time it's called
+  if (!indentation)
+  {
+    // get the top meaningful element to parse
+    if (element.nodeType === 9)
+      element = element.documentElement;
+    // accept only elements
+    if (element.nodeType !== 1)
+      throw new Error("Unable to serialize " + element);
+    // avoid original XML pollution at first iteration
+    element = element.cloneNode(true);
+  }
+  const before = "  ".repeat(indentation + 1);
+  const after = "  ".repeat(indentation);
+  const doc = element.ownerDocument;
+  const children = element.children;
+  const length = children.length;
+  for (let i = 0; i < length; i++)
+  {
+    const child = children[i];
+    element.insertBefore(doc.createTextNode(`\n${before}`), child);
+    asIndentedString(child, indentation + 1);
+    if ((i + 1) === length)
+      element.appendChild(doc.createTextNode(`\n${after}`));
+  }
+  // inner calls don't need to bother serialization
+  if (indentation)
+    return "";
+  // easiest way to recognize an HTML element from an XML one
+  if (/^https?:\/\/www\.w3\.org\/1999\/xhtml$/.test(element.namespaceURI))
+    return element.outerHTML;
+  // all other elements should use XML serializer
+  return new XMLSerializer().serializeToString(element);
+}
 
 },{}],2:[function(require,module,exports){
 /*
@@ -201,6 +247,17 @@ class IOElement extends HyperHTMLElement
 
   // whenever an element is created, render its content once
   created() { this.render(); }
+
+  // based on a `--component-name: ready;` convention
+  // under the `component-name {}` related stylesheet,
+  // this method returns true only if such stylesheet
+  // has been already loaded.
+  isStyled()
+  {
+    const computed = window.getComputedStyle(this, null);
+    const property = "--" + this.nodeName.toLowerCase();
+    return computed.getPropertyValue(property).trim() === "ready";
+  }
 
   // by default, render is a no-op
   render() {}
@@ -2044,7 +2101,8 @@ class HyperHTMLElement extends HTMLElement {
     // Boolean attributes are also automatically observed.
     const booleanAttributes = Class.booleanAttributes || [];
     booleanAttributes.forEach(name => {
-      if (!(name in proto)) defineProperty(
+      if (!(name in proto))
+        defineProperty(
         proto,
         camel(name),
         {
@@ -2074,7 +2132,8 @@ class HyperHTMLElement extends HTMLElement {
     observedAttributes.forEach(name => {
       // it is possible to redefine the behavior at any time
       // simply overwriting get prop() and set prop(value)
-      if (!(name in proto)) defineProperty(
+      if (!(name in proto))
+        defineProperty(
         proto,
         camel(name),
         {
@@ -2284,7 +2343,8 @@ class HyperHTMLElement extends HTMLElement {
     const target = this.state;
     const source = typeof state === 'function' ? state.call(this, target) : state;
     for (const key in source) target[key] = source[key];
-    if (render !== false) this.render();
+    if (render !== false)
+      this.render();
     return this;
   }
 
@@ -2298,7 +2358,8 @@ HyperHTMLElement.wire = wire;
 HyperHTMLElement.hyper = hyper;
 
 try {
-  if (Symbol.hasInstance) classes.push(
+  if (Symbol.hasInstance)
+    classes.push(
     defineProperty(HyperHTMLElement, Symbol.hasInstance, {
       enumerable: false,
       configurable: true,
@@ -2333,13 +2394,20 @@ if (!dom.ready()) {
   document.addEventListener(dom.type, dom, false);
 }
 
+
+const dafuq = new WeakSet;
 function checkReady(created) {
   if (dom.ready() || isReady.call(this, created)) {
     if (this._init$) {
+      if (dafuq.has(this))
+        throw new Error('WTF');
+      dafuq.add(this);
       const list = this._init$$;
-      if (list) delete this._init$$;
+      if (list)
+        delete this._init$$;
       created.call(defineProperty(this, '_init$', {value: false}));
-      if (list) list.forEach(invoke);
+      if (list)
+        list.forEach(invoke);
     }
   } else {
     if (!this.hasOwnProperty('_init$$'))
