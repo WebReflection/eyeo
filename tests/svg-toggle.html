@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+  #big-toggle #outer-circle {
+    fill: #585858;
+    transition: all 0.2s ease-out;
+  }
+  #big-toggle.on #outer-circle {
+    fill: #0797E1;
+  }
+  </style>
+</head>
+<body>
+    <svg id="big-toggle" width="77px" height="45px" viewBox="0 0 77 45" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <defs>
+            <circle id="path-1" cx="23" cy="22.4" r="22.4"></circle>
+        </defs>
+        <g id="toggle_canvas" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+            <g id="toggle">
+                <rect id="base" fill="#E4E4E4" x="1" y="16.8" width="64.4" height="12.6" rx="6.3"></rect>
+                <g id="toggle-circles" transform="translate(31.600000, 0)">
+                    <mask id="mask-2" fill="white">
+                        <use xlink:href="#path-1" transform="translate(-32.4, 0)"></use>
+                    </mask>
+                    <use id="outer-circle" xlink:href="#path-1" transform="translate(-32.4, 0)"></use>
+                    <circle id="inner-circle-blue" fill="#0688CB" mask="url(#mask-2)" cx="24" cy="22.4" r="9.8">
+                      <animate attributeName="cx" dur="0.2s" begin="click" />
+                    </circle>
+                    <circle id="inner-circle-grey" fill="#4B4B4B" mask="url(#mask-2)" cx="-9.2" cy="22.4" r="9.8">
+                      <animate attributeName="cx" dur="0.2s" begin="click" />
+                    </circle>
+                </g>
+            </g>
+        </g>
+    </svg>
+    <script>
+    window['big-toggle'].addEventListener('click', event => {
+      const {currentTarget} = event;
+      const use = currentTarget.querySelector('#mask-2 use');
+      const outer = currentTarget.querySelector('#outer-circle');
+      const [blue, grey] = currentTarget.querySelectorAll('#inner-circle-blue, #inner-circle-grey');
+      if (currentTarget.classList.contains('on'))
+      {
+        currentTarget.classList.remove('on');
+        use.setAttribute('transform', 'translate(-32.4, 0)');
+        outer.setAttribute('transform', 'translate(-32.4, 0)');
+
+        const blueAnimate = blue.querySelector('animate');
+        blueAnimate.setAttribute('from', '12');
+        blueAnimate.setAttribute('to', '24');
+        blue.setAttribute('cx', '24');
+        blue.dispatchEvent(new Event(event.type));
+
+        const greyAnimate = grey.querySelector('animate');
+        greyAnimate.setAttribute('from', '-24');
+        greyAnimate.setAttribute('to', '-9.2');
+        grey.setAttribute('cx', '-9.2');
+        grey.dispatchEvent(new Event(event.type));
+      }
+      else
+      {
+        currentTarget.classList.add('on');
+        use.setAttribute('transform', 'translate(-11.4, 0)');
+        outer.setAttribute('transform', 'translate(-11.4, 0)');
+
+        const blueAnimate = blue.querySelector('animate');
+        blueAnimate.setAttribute('from', '24');
+        blueAnimate.setAttribute('to', '12');
+        blue.setAttribute('cx', '12');
+        blue.dispatchEvent(new Event(event.type));
+
+        const greyAnimate = grey.querySelector('animate');
+        greyAnimate.setAttribute('from', '-9.2');
+        greyAnimate.setAttribute('to', '-24');
+        grey.setAttribute('cx', '-24');
+        grey.dispatchEvent(new Event(event.type));
+      }
+    });
+    </script>
+</body>
+</html>
