@@ -4,11 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-  #big-toggle #outer-circle {
+  #big-toggle #outer-circle,
+  #big-toggle #mask-2 use
+  {
+    transform: translate(-32.4px, 0px);
+    transition: all 0.2s ease-out;
+  }
+  #big-toggle.on #outer-circle,
+  #big-toggle.on #mask-2 use
+  {
+    transform: translate(-11.4px, 0px);
+  }
+  #big-toggle #outer-circle
+  {
     fill: #585858;
     transition: all 0.2s ease-out;
   }
-  #big-toggle.on #outer-circle {
+  #big-toggle.on #outer-circle
+  {
     fill: #0797E1;
   }
   </style>
@@ -23,9 +36,9 @@
                 <rect id="base" fill="#E4E4E4" x="1" y="16.8" width="64.4" height="12.6" rx="6.3"></rect>
                 <g id="toggle-circles" transform="translate(31.600000, 0)">
                     <mask id="mask-2" fill="white">
-                        <use xlink:href="#path-1" transform="translate(-32.4, 0)"></use>
+                        <use xlink:href="#path-1"></use>
                     </mask>
-                    <use id="outer-circle" xlink:href="#path-1" transform="translate(-32.4, 0)"></use>
+                    <use id="outer-circle" xlink:href="#path-1"></use>
                     <circle id="inner-circle-blue" fill="#0688CB" mask="url(#mask-2)" cx="24" cy="22.4" r="9.8">
                       <animate attributeName="cx" dur="0.2s" begin="click" />
                     </circle>
@@ -45,8 +58,6 @@
       if (currentTarget.classList.contains('on'))
       {
         currentTarget.classList.remove('on');
-        use.setAttribute('transform', 'translate(-32.4, 0)');
-        outer.setAttribute('transform', 'translate(-32.4, 0)');
 
         const blueAnimate = blue.querySelector('animate');
         blueAnimate.setAttribute('from', '12');
@@ -63,8 +74,6 @@
       else
       {
         currentTarget.classList.add('on');
-        use.setAttribute('transform', 'translate(-11.4, 0)');
-        outer.setAttribute('transform', 'translate(-11.4, 0)');
 
         const blueAnimate = blue.querySelector('animate');
         blueAnimate.setAttribute('from', '24');
