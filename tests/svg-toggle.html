@@ -4,11 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+  #big-toggle
+  {
+    --transition-duration: 0.2s;
+  }
   #big-toggle #outer-circle,
   #big-toggle #mask-2 use
   {
     transform: translate(-32.4px, 0px);
-    transition: all 0.2s ease-out;
+    transition: all var(--transition-duration) ease-out;
   }
   #big-toggle.on #outer-circle,
   #big-toggle.on #mask-2 use
@@ -18,7 +22,7 @@
   #big-toggle #outer-circle
   {
     fill: #585858;
-    transition: all 0.2s ease-out;
+    transition: all var(--transition-duration) ease-out;
   }
   #big-toggle.on #outer-circle
   {
