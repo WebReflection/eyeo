@@ -6,7 +6,7 @@
   <style>
   #big-toggle
   {
-    --transition-duration: 0.2s;
+    --transition-duration: 0.15s;
   }
   #big-toggle #outer-circle,
   #big-toggle #mask-2 use
@@ -44,36 +44,36 @@
                     </mask>
                     <use id="outer-circle" xlink:href="#path-1"></use>
                     <circle id="inner-circle-blue" fill="#0688CB" mask="url(#mask-2)" cx="24" cy="22.4" r="9.8">
-                      <animate attributeName="cx" dur="0.2s" begin="click" />
+                      <animate attributeName="cx" dur="0.15s" begin="click" />
                     </circle>
                     <circle id="inner-circle-grey" fill="#4B4B4B" mask="url(#mask-2)" cx="-9.2" cy="22.4" r="9.8">
-                      <animate attributeName="cx" dur="0.2s" begin="click" />
+                      <animate attributeName="cx" dur="0.15s" begin="click" />
                     </circle>
                 </g>
             </g>
         </g>
     </svg>
     <script>
-    window['big-toggle'].addEventListener('click', event => {
-      const {currentTarget} = event;
-      const use = currentTarget.querySelector('#mask-2 use');
-      const outer = currentTarget.querySelector('#outer-circle');
-      const [blue, grey] = currentTarget.querySelectorAll('#inner-circle-blue, #inner-circle-grey');
+    document.body.addEventListener('click', event => {
+      const currentTarget = document.querySelector('#big-toggle');
+      const use = document.querySelector('#mask-2 use');
+      const outer = document.querySelector('#outer-circle');
+      const [blue, grey] = document.querySelectorAll('#inner-circle-blue, #inner-circle-grey');
       if (currentTarget.classList.contains('on'))
       {
         currentTarget.classList.remove('on');
 
-        const blueAnimate = blue.querySelector('animate');
+        const blueAnimate = blue.firstElementChild;
         blueAnimate.setAttribute('from', '12');
         blueAnimate.setAttribute('to', '24');
         blue.setAttribute('cx', '24');
-        blue.dispatchEvent(new Event(event.type));
+        blue.dispatchEvent(new CustomEvent(event.type));
 
-        const greyAnimate = grey.querySelector('animate');
+        const greyAnimate = grey.firstElementChild;
         greyAnimate.setAttribute('from', '-24');
         greyAnimate.setAttribute('to', '-9.2');
         grey.setAttribute('cx', '-9.2');
-        grey.dispatchEvent(new Event(event.type));
+        grey.dispatchEvent(new CustomEvent(event.type));
       }
       else
       {
