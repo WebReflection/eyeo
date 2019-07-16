@@ -58,7 +58,8 @@
       const currentTarget = document.querySelector('#big-toggle');
       const use = document.querySelector('#mask-2 use');
       const outer = document.querySelector('#outer-circle');
-      const [blue, grey] = document.querySelectorAll('#inner-circle-blue, #inner-circle-grey');
+      const blue = document.querySelector('#inner-circle-blue');
+      const grey = document.querySelector('#inner-circle-grey');
       if (currentTarget.classList.contains('on'))
       {
         currentTarget.classList.remove('on');
