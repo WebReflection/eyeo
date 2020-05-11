@@ -107,6 +107,9 @@
       function weakReferences() {
         var wm = new WeakMap;
         var ws = new WeakSet;
+      },
+      function imports() {
+        eval('import("../base-component.js")');
       }
     ]
       .sort(function (a, b) { return getName(a) < getName(b) ? -1 : 1; })
