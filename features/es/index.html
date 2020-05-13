@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <script>
+  this.onload = function () {
+    alert(window.ok || 'nope');
+  };
+  </script>
+  <script type="module">
+  import ok from './ok.js';
+  window.ok = ok;
+  </script>
+</head>
+</html>
