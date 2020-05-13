@@ -108,7 +108,12 @@
         var wm = new WeakMap;
         var ws = new WeakSet;
       },
-      function imports() {
+      function staticImports() {
+        var s = document.createElement('script');
+        if (!('noModule' in s))
+          throw new Error('static imports fails');
+      },
+      function dynamicImports() {
         eval('import("../base-component.js")');
       }
     ]
