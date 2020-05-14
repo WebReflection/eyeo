@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Footer</title>
+  <title>Bing</title>
   <link rel="stylesheet" type="text/css" href="style.css">
   <script src="script.js"></script>
 </head>
@@ -15,7 +15,64 @@
 
   <div id="bubble_ui" class="hidden-bubble">
     <div class="bubble-content">
-      <img src="imgs/bubble-ui.svg" />
+      <img src="imgs/bubble-ui_header.svg" />
+      <div id="bubble-domain">
+        <div class="toggle-wrapper main-domain">
+          <svg id="toggle_canvas" class="" width="80px" height="40px" viewBox="0 0 77 45" version="1.1" tabindex="0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <title>web toggle animation</title>
+            <desc>toggle on/off</desc>
+            <defs>
+                <circle id="path-1" cx="23" cy="22.4" r="22.4"></circle>
+            </defs>
+            <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <g id="toggle">
+                    <rect id="base" fill="#E4E4E4" x="1" y="16.8" width="64.4" height="12.6" rx="6.3"></rect>
+                    <g id="toggle-circles" transform="translate(31.600000, 0)">
+                        <mask id="mask-2" fill="white">
+                            <use id="mask-wrap" xlink:href="#path-1" transform="translate(0, 0)"></use>  
+                            
+                        </mask>
+                        <use id="outer-circle" fill="#0797E1" xlink:href="#path-1"></use>
+                       
+                        
+                        <circle id="inner-circle-blue" fill="#0688CB" mask="url(#mask-2)" transform="translate(0, 0)" cx="12" cy="22.4" r="9.8"></circle>
+                        <circle id="inner-circle-grey" fill="#4B4B4B" mask="url(#mask-2)" transform="translate(0, 0)" cx="-24" cy="22.4" r="9.8"></circle>
+                    </g>
+                </g>
+            </g>
+        </svg>
+        </div> <!-- Toggle1 -->
+
+        <div class="toggle-wrapper single-page">
+          <svg id="toggle_canvas2" class="" width="80px" height="40px" viewBox="0 0 77 45" version="1.1" tabindex="0" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <title>web toggle animation</title>
+            <desc>toggle on/off</desc>
+            <defs>
+                <circle id="path-12" cx="23" cy="22.4" r="22.4"></circle>
+            </defs>
+            <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <g id="toggle2">
+                    <rect id="base2" fill="#E4E4E4" x="1" y="16.8" width="64.4" height="12.6" rx="6.3"></rect>
+                    <g id="toggle-circles2" transform="translate(31.600000, 0)">
+                        <mask id="mask-22" fill="white">
+                            <use id="mask-wrap2" xlink:href="#path-12" transform="translate(0, 0)"></use>  
+                            
+                        </mask>
+                        <use id="outer-circle2" fill="#0797E1" xlink:href="#path-12"></use>
+                       
+                        
+                        <circle id="inner-circle-blue2" fill="#0688CB" mask="url(#mask-22)" transform="translate(0, 0)" cx="12" cy="22.4" r="9.8"></circle>
+                        <circle id="inner-circle-grey2" fill="#4B4B4B" mask="url(#mask-22)" transform="translate(0, 0)" cx="-24" cy="22.4" r="9.8"></circle>
+                    </g>
+                </g>
+            </g>
+        </svg>
+        </div> <!-- Toggle2 -->
+
+
+      </div>
+      <img src="imgs/bubble-ui_numbers.svg" />
+      <!-- <img src="imgs/bubble-ui.svg" /> -->
     </div>
     <footer>
       <div class="container">
@@ -63,14 +120,22 @@
         </div>
       </div>
       <div class="timeline">
-        <span></span>
-        <span></span>
-        <span></span>
+        <span class="timeline-item"></span>
+        <span class="timeline-item"></span>
+        <span class="timeline-item"></span>
       </div>
     </footer>
 </div>
 
 <iframe src="https://www.bing.com/" width="100%" height="100%" style="border:0"></iframe>
+
+
+
+
+
+
+
+
 
 
 </body>
