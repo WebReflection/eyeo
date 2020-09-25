@@ -4,6 +4,55 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSS ::has(...)</title>
+  <style>
+  /*
+    ideally, none of the JavaScript would be needed,
+    as the following selector would already do the trick
+  */
+  some-content:has([aria-label="Sponsored"]) {
+    background-color: red;
+    font-weight: bold;
+  }
+  some-content.ad {
+    background-color: red;
+    font-weight: bold;
+  }
+  some-content.ad [aria-label] {
+    text-align: center;
+  }
+  body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  main {
+    display: flex;
+    flex-direction: column;
+    width: 400px;
+  }
+  main > progress {
+    margin: 8px auto;
+    transition: opacity 1s;
+  }
+  aside {
+    padding: 8px;
+  }
+  aside label {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+  }
+  aside label:hover {
+    background-color: #eee;
+  }
+  label, label * {
+    cursor: pointer;
+  }
+  aside {
+    position: fixed;
+    right: 0;
+  }
+  </style>
   <script defer src="uce-template.js"></script>
   <script>
   addEventListener(
@@ -90,47 +139,6 @@
     {once: true}
   );
   </script>
-  <style>
-  body {
-    font-family: sans-serif;
-    display: flex;
-    justify-content: center;
-  }
-  main {
-    display: flex;
-    flex-direction: column;
-    width: 400px;
-  }
-  main > progress {
-    margin: 8px auto;
-    transition: opacity 1s;
-  }
-  aside {
-    padding: 8px;
-  }
-  aside label {
-    display: flex;
-    align-items: center;
-    padding: 8px;
-  }
-  aside label:hover {
-    background-color: #eee;
-  }
-  label, label * {
-    cursor: pointer;
-  }
-  aside {
-    position: fixed;
-    right: 0;
-  }
-  some-content.ad {
-    background-color: red;
-    font-weight: bold;
-  }
-  some-content.ad [aria-label] {
-    text-align: center;
-  }
-  </style>
 </head>
 <body>
   <main>
