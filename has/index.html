@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS ::has(...)</title>
+  <script defer src="uce-template.js"></script>
+  <script>
+  addEventListener(
+    'DOMContentLoaded',
+    () => {
+      let observer;
+      let loadMore = true;
+      let parsed = new WeakSet;
+      const {round} = Math;
+      const main = document.querySelector('main');
+      const progress = document.querySelector('progress');
+      const highlight = document.querySelector('input[name="highlight"]');
+      const optimized = document.querySelector('input[name="optimized"]');
+      highlight.addEventListener('change', () => {
+        if (highlight.checked) {
+          const callback = mutations => {
+            if (optimized.checked) {
+              console.time('Optimized Ads finder');
+              for (const {addedNodes} of mutations) {
+                for (const node of addedNodes) {
+                  if (node.querySelectorAll) {
+                    const label = node.querySelector('[aria-label="Sponsored"]');
+                    if (label)
+                      // unnecessary in this demo, but done live due possible
+                      // sub nodes added later on within content
+                      label.closest('some-content').classList.add('ad');
+                  }
+                }
+              }
+              console.timeEnd('Optimized Ads finder');
+            }
+            else {
+              console.time('Simplified Ads finder');
+              for (const label of main.querySelectorAll('[aria-label="Sponsored"]')) {
+                const node = label.closest('some-content');
+                if (node && !parsed.has(node)) {
+                  parsed.add(node);
+                  node.classList.add('ad');
+                }
+              }
+              console.timeEnd('Simplified Ads finder');
+            }
+          };
+          observer = new MutationObserver(callback);
+          observer.observe(main, {childList: true, subtree: true});
+          callback([{addedNodes: main.querySelectorAll('some-content')}]);
+        }
+        else {
+          observer.disconnect();
+          for (const el of main.querySelectorAll('.ad'))
+            el.classList.remove('ad');
+          parsed = new WeakSet;
+        }
+      });
+      const scroll = () => {
+        if (loadMore) {
+          const {documentElement, body} = document;
+          const scrollTarget = body.scrollTop ? body : documentElement;
+          const {clientHeight, scrollHeight, scrollTop} = scrollTarget;
+          if (round(scrollHeight - scrollTop) === round(clientHeight)) {
+            loadMore = false;
+            progress.style.opacity = 1;
+            setTimeout(
+              () => {
+                progress.style.opacity = 0;
+                let more = 2 + parseInt(Math.random() * 5);
+                while (more--)
+                  main.insertBefore(
+                    document.createElement('some-content'),
+                    progress
+                  );
+                loadMore = true;
+                scroll();
+              },
+              Math.random() * 1500
+            );
+          }
+        }
+      };
+      addEventListener('scroll', scroll);
+      addEventListener('mousewheel', scroll);
+      setTimeout(dispatchEvent, 300, new CustomEvent('scroll'));
+    },
+    {once: true}
+  );
+  </script>
+  <style>
+  body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  main {
+    display: flex;
+    flex-direction: column;
+    width: 400px;
+  }
+  main > progress {
+    margin: 8px auto;
+    transition: opacity 1s;
+  }
+  aside {
+    padding: 8px;
+  }
+  aside label {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+  }
+  aside label:hover {
+    background-color: #eee;
+  }
+  label, label * {
+    cursor: pointer;
+  }
+  aside {
+    position: fixed;
+    right: 0;
+  }
+  some-content.ad {
+    background-color: red;
+    font-weight: bold;
+  }
+  some-content.ad [aria-label] {
+    text-align: center;
+  }
+  </style>
+</head>
+<body>
+  <main>
+    <some-content></some-content>
+    <some-content></some-content>
+    <progress style="opacity:0"></progress>
+  </main>
+  <aside>
+    <p>
+      <label>
+        Highlight Ads
+        <input name="highlight" type="checkbox">
+      </label>
+      <label>
+        Use optimized finder
+        <input name="optimized" type="checkbox">
+      </label>
+    </p>
+  </aside>
+  <template is="uce-template">
+    <some-content>
+      <h3>{{title}}</h3>
+      <div>
+        <p aria-label={{label}}>
+          {{content}}
+        </p>
+      </div>
+    </some-content>
+    <script type="module">
+    let i = 0;
+    export default {
+      setup() {
+        const label = Math.random() < .3 ? 'Sponsored' : '';
+        return {
+          label,
+          title: `This is title #${++i}`,
+          content: label === 'Sponsored' ?
+            'AD' : `This is some content related to title #${i}. `
+                    .repeat(1 + Math.random() * 10)
+        };
+      }
+    };
+    </script>
+    <style>
+    some-content {
+      display: block;
+      background-color: #eee;
+      padding: 8px;
+    }
+    some-content:not(:first-of-type) {
+      margin-top: 8px;
+    }
+    </style>
+    <style scoped>
+      h3 {
+        margin: 0;
+      }
+    </style>
+  </template>
+</body>
+</html>
