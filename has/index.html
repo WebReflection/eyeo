@@ -37,6 +37,9 @@
   aside {
     padding: 8px;
   }
+  aside button {
+    padding: 8px;
+  }
   aside label {
     display: flex;
     align-items: center;
@@ -66,6 +69,7 @@
       const progress = document.querySelector('progress');
       const highlight = document.querySelector('input[name="highlight"]');
       const optimized = document.querySelector('input[name="optimized"]');
+      const random = document.querySelector('button[name="random"]');
       highlight.addEventListener('change', () => {
         if (highlight.checked) {
           const callback = mutations => {
@@ -132,6 +136,23 @@
           }
         }
       };
+      random.addEventListener('click', event => {
+        event.preventDefault();
+        const all = document.querySelectorAll('some-content');
+        let {length} = all;
+        all.forEach(el => {
+          const rand = Math.random();
+          if (rand < .9) {
+            if (rand < .4)
+              el.replaceWith(document.createElement('some-content'));
+            else if (rand < .7)
+              document.createElement('some-content').before(el);
+            else if (length--)
+              el.remove();
+          }
+        });
+        scroll();
+      });
       addEventListener('scroll', scroll);
       addEventListener('mousewheel', scroll);
       setTimeout(dispatchEvent, 300, new CustomEvent('scroll'));
@@ -156,6 +177,9 @@
         Use optimized finder
         <input name="optimized" type="checkbox">
       </label>
+      <button name="random">
+        Replace random nodes
+      </button>
     </p>
   </aside>
   <template is="uce-template">
