@@ -195,7 +195,9 @@
     let i = 0;
     export default {
       setup() {
-        const label = Math.random() < .3 ? 'Sponsored' : '';
+        const label = Math.random() < .3 ?
+                      'Sponsored' :
+                      (Math.random() < .5 ? 'Suggested' : '');
         return {
           label,
           title: `This is title #${++i}`,
