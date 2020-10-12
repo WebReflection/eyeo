@@ -69,35 +69,65 @@
       const progress = document.querySelector('progress');
       const highlight = document.querySelector('input[name="highlight"]');
       const optimized = document.querySelector('input[name="optimized"]');
+      const xpath = document.querySelector('input[name="xpath"]');
       const random = document.querySelector('button[name="random"]');
+      const xpathQuery = root => document.evaluate(
+        './/*[@aria-label="Sponsored"]/ancestor-or-self::some-content',
+        root,
+        null,
+        XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+        null
+      );
       highlight.addEventListener('change', () => {
         if (highlight.checked) {
           const callback = mutations => {
+            const {checked} = xpath;
             if (optimized.checked) {
-              console.time('Optimized Ads finder');
+              const title = 'Optimized Ads finder' + (checked ? ' - XPath' : '');
+              console.time(title);
               for (const {addedNodes} of mutations) {
                 for (const node of addedNodes) {
                   if (node.querySelectorAll) {
-                    const label = node.querySelector('[aria-label="Sponsored"]');
-                    if (label)
-                      // unnecessary in this demo, but done live due possible
-                      // sub nodes added later on within content
-                      label.closest('some-content').classList.add('ad');
+                    if (checked) {
+                      const nodes = xpathQuery(node);
+                      for (let i = 0, {snapshotLength} = nodes; i < snapshotLength; i++)
+                        nodes.snapshotItem(i).classList.add('ad');
+                    }
+                    else {
+                      const label = node.querySelector('[aria-label="Sponsored"]');
+                      if (label)
+                        // unnecessary in this demo, but done live due possible
+                        // sub nodes added later on within content
+                        label.closest('some-content').classList.add('ad');
+                    }
                   }
                 }
               }
-              console.timeEnd('Optimized Ads finder');
+              console.timeEnd(title);
             }
             else {
-              console.time('Simplified Ads finder');
-              for (const label of main.querySelectorAll('[aria-label="Sponsored"]')) {
-                const node = label.closest('some-content');
-                if (node && !parsed.has(node)) {
-                  parsed.add(node);
-                  node.classList.add('ad');
+              const title = 'Simplified Ads finder' + (checked ? ' - XPath' : '');
+              console.time(title);
+              if (checked) {
+                const nodes = xpathQuery(main);
+                for (let i = 0, {snapshotLength} = nodes; i < snapshotLength; i++) {
+                  const node = nodes.snapshotItem(i);
+                  if (!parsed.has(node)) {
+                    parsed.add(node);
+                    node.classList.add('ad');
+                  }
                 }
               }
-              console.timeEnd('Simplified Ads finder');
+              else {
+                for (const label of main.querySelectorAll('[aria-label="Sponsored"]')) {
+                  const node = label.closest('some-content');
+                  if (node && !parsed.has(node)) {
+                    parsed.add(node);
+                    node.classList.add('ad');
+                  }
+                }
+              }
+              console.timeEnd(title);
             }
           };
           observer = new MutationObserver(callback);
@@ -176,6 +206,10 @@
       <label>
         Use optimized finder
         <input name="optimized" type="checkbox">
+      </label>
+      <label>
+        Use XPath
+        <input name="xpath" type="checkbox">
       </label>
       <button name="random">
         Replace random nodes
