@@ -71,13 +71,9 @@
       const optimized = document.querySelector('input[name="optimized"]');
       const xpath = document.querySelector('input[name="xpath"]');
       const random = document.querySelector('button[name="random"]');
-      const xpathQuery = root => document.evaluate(
-        './/*[@aria-label="Sponsored"]/ancestor-or-self::some-content',
-        root,
-        null,
-        XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-        null
-      );
+      const evaluator = new XPathEvaluator;
+      const expression = evaluator.createExpression('.//*[@aria-label="Sponsored"]/ancestor-or-self::some-content', null);
+      const xpathQuery = root => expression.evaluate(root, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
       highlight.addEventListener('change', () => {
         if (highlight.checked) {
           const callback = mutations => {
