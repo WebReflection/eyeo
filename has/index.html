@@ -8,10 +8,13 @@
   /*
     ideally, none of the JavaScript would be needed,
     as the following selector would already do the trick
-  */
   some-content:has([aria-label="Sponsored"]) {
     background-color: red;
     font-weight: bold;
+  }
+  */
+  body {
+    overflow-y: scroll;
   }
   some-content.ad {
     background-color: red;
@@ -45,15 +48,32 @@
     align-items: center;
     padding: 8px;
   }
-  aside label:hover {
+  aside label.disabled {
+    opacity: .7;
+  }
+  aside label:not(.disabled):hover {
     background-color: #eee;
   }
-  label, label * {
+  aside label, aside button {
+    display: flex;
+    width: 100%;
+  }
+  aside label > span {
+    flex-grow: 1;
+  }
+  aside label:not(.disabled),
+  aside label:not(.disabled) * {
     cursor: pointer;
+  }
+  aside label input {
+    transform: translateX(-8px);
   }
   aside {
     position: fixed;
     right: 0;
+  }
+  .invisible, some-content[ignore] {
+    display: none;
   }
   </style>
   <script defer src="uce-template.js"></script>
@@ -70,15 +90,39 @@
       const highlight = document.querySelector('input[name="highlight"]');
       const optimized = document.querySelector('input[name="optimized"]');
       const xpath = document.querySelector('input[name="xpath"]');
+      const has = document.querySelector('input[name="has"]');
       const random = document.querySelector('button[name="random"]');
       const evaluator = new XPathEvaluator;
       const expression = evaluator.createExpression('.//*[@aria-label="Sponsored"]/ancestor-or-self::some-content', null);
       const xpathQuery = root => expression.evaluate(root, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      const hasSelector = 'some-content:has([aria-label="Sponsored"])';
+      try {
+        has.matches(hasSelector);
+        has.addEventListener('change', () => {
+          xpath.disabled = has.checked;
+          optimized.disabled = has.checked;
+          if (!highlight.checked)
+            highlight.checked = true;
+          highlight.dispatchEvent(new CustomEvent('change'));
+        });
+      }
+      catch (o_O) {
+        has.disabled = true;
+        has.title = 'not supported';
+        has.closest('label').classList.add('disabled');
+      }
       highlight.addEventListener('change', () => {
         if (highlight.checked) {
           const callback = mutations => {
             const {checked} = xpath;
-            if (optimized.checked) {
+            if (has.checked) {
+              const title = 'CSS:has(Ads) finder';
+              console.time(title);
+              for (const node of main.querySelectorAll(hasSelector))
+                node.classList.add('ad');
+              console.timeEnd(title);
+            }
+            else if (optimized.checked) {
               const title = 'Optimized Ads finder' + (checked ? ' - XPath' : '');
               console.time(title);
               for (const {addedNodes} of mutations) {
@@ -128,7 +172,7 @@
           };
           observer = new MutationObserver(callback);
           observer.observe(main, {childList: true, subtree: true});
-          callback([{addedNodes: main.querySelectorAll('some-content')}]);
+          callback([{addedNodes: main.parentElement.querySelectorAll('main > some-content')}]);
         }
         else {
           observer.disconnect();
@@ -164,7 +208,7 @@
       };
       random.addEventListener('click', event => {
         event.preventDefault();
-        const all = document.querySelectorAll('some-content');
+        const all = document.querySelectorAll('main > some-content');
         let {length} = all;
         all.forEach(el => {
           const rand = Math.random();
@@ -196,16 +240,20 @@
   <aside>
     <p>
       <label>
-        Highlight Ads
+        <span>Highlight Ads</span>
         <input name="highlight" type="checkbox">
       </label>
       <label>
-        Use optimized finder
+        <span>Use optimized finder</span>
         <input name="optimized" type="checkbox">
       </label>
       <label>
-        Use XPath
+        <span>Use XPath</span>
         <input name="xpath" type="checkbox">
+      </label>
+      <label>
+        <span>Use CSS :has()</span>
+        <input name="has" type="checkbox">
       </label>
       <button name="random">
         Replace random nodes
@@ -216,15 +264,28 @@
     <some-content>
       <h3>{{title}}</h3>
       <div>
-        <p aria-label={{label}}>
-          {{content}}
-        </p>
+        <div>
+          <div aria-label={{label}}></div>
+          <div>
+            <div>
+              <div>
+                <p aria-label={{label}}>
+                  {{content}}
+                </p>
+              </div>
+            </div>
+          </div>
+          {{random}}
+        </div>
       </div>
     </some-content>
     <script type="module">
+    import {html} from '@uce';
     let i = 0;
     export default {
-      setup() {
+      setup(element) {
+        if (element.hasAttribute('ignore'))
+          return {label: '', title: '', content: '', random: []};
         const label = Math.random() < .3 ?
                       'Sponsored' :
                       (Math.random() < .2 ? 'Suggested' : '');
@@ -233,7 +294,17 @@
           title: `This is title #${++i}`,
           content: label === 'Sponsored' ?
             'AD' : `This is some content related to title #${i}. `
-                    .repeat(1 + Math.random() * 10)
+                    .repeat(1 + Math.random() * 10),
+          get random() {
+            const out = [];
+            for (let i = (Math.random() * 10 + 5) >>> 0; i--;) {
+              out.push(
+                html`<div class="invisible">${i}</div>`,
+                html`<some-content ignore />`
+              );
+            }
+            return out;
+          }
         };
       }
     };
